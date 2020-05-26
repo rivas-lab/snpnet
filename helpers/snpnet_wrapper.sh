@@ -3,7 +3,7 @@ set -beEuo pipefail
 
 SRCNAME=$(readlink -f $0)
 PROGNAME=$(basename $SRCNAME)
-VERSION="0.3.0"
+VERSION="0.3.10"
 NUM_POS_ARGS="5"
 
 source "$(dirname ${SRCNAME})/snpnet_misc.sh"
@@ -53,7 +53,8 @@ cat <<- EOF
 	  --verbose             Set vervose=T and KKT_verbose=T
 	  --no_validation       Set validation=T
 	  --glmnetPlus          Set glmnetPlus=T
-      --rank                Set rank=T
+	  --rank                Set rank=T
+	  --p_factor_file       Specify the R data file that contains the penalty factors
 
 	
 	Default configurations for snpnet (please use the options above to modify them):
@@ -92,6 +93,7 @@ validation=T
 glmnetPlus=F
 vzs=T
 rank=F
+p_factor_file="None"
 ## == Default parameters (end) == ##
 
 declare -a params=()
@@ -106,7 +108,7 @@ for OPT in "$@" ; do
         '--snpnet_dir' )
             snpnet_dir=$2 ; shift 2 ;
             ;;
-        '-t' | '--nCores' )
+        '-t' | '--cpus' | '--nCores' )
             nCores=$2 ; shift 2 ;
             ;;
         '-m' | '--mem' | '--memory' )
@@ -147,6 +149,9 @@ for OPT in "$@" ; do
             ;;
         '--rank' )
             rank="T" ; shift 1 ;            
+            ;;
+        '--p_factor_file' )
+            p_factor_file=$2 ; shift 2 ;            
             ;;
         '--'|'-' )
             shift 1 ; params+=( "$@" ) ; break
@@ -204,6 +209,7 @@ cat <<- EOF | tr " " "\t" > ${config_file}
 	use.glmnetPlus ${glmnetPlus}
 	rank ${rank}
 	vzs ${vzs}
+	p.factor.file ${p_factor_file}
 EOF
 
 echo "===================config_file===================" >&2

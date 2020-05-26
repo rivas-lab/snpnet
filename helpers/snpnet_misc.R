@@ -71,6 +71,18 @@ read_config_from_file <- function(config_file){
     if(!'validation' %in% names(config)) config[['validation']] <- FALSE
     if(!config[['validation']]) config[['split.col']] <- NULL
     config[['covariates']] = parse_covariates(config[['covariates']])
+
+    if(
+        ('p.factor.file' %in% names(config)) && 
+        (! is.null(config[['p.factor.file']])) &&
+        (! config[['p.factor.file']] %in% c('null', 'Null', 'NULL', 'none', 'None', 'NONE'))
+    ){
+        config[['p.factor']] <- readRDS(
+            config[['p.factor.file']]
+        )
+    }else if (! 'p.factor' %in% names(config)) {
+        config[['p.factor']] <- NULL
+    }
     config
 }
 

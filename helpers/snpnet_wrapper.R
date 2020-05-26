@@ -29,6 +29,7 @@ fit <- snpnet(
     covariates     = configs[['covariates']],
     alpha          = configs[['alpha']],
     split.col      = configs[['split.col']],
+    p.factor       = configs[['p.factor']],
     status.col     = configs[['status.col']],
     mem            = configs[['mem']],
     configs        = configs
