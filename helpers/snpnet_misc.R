@@ -109,9 +109,13 @@ snpnet_fit_to_df <- function(beta, lambda_idx, covariates = NULL, verbose=FALSE)
 save_BETA <- function(df, out.file.head, pvar, vzs = TRUE, covariates = NULL, verbose=FALSE){
     file.geno   <- paste0(out.file.head, ".tsv")
     file.covars <- paste0(out.file.head, ".covars.tsv")
+    file.timestamp <- format(Sys.time(), format="%Y%m%d-%H%M%S")
 
     if(! is.null(covariates)){
         if(verbose) snpnet::snpnetLogger(sprintf('Saving results to %s', file.covars), funcname='snpnetWrapper')
+        if(file.exists(file.covars)){
+            file.rename(file.covars, paste0(out.file.head, ".", file.timestamp, ".covars.tsv"))
+        }
         df %>% filter(ID %in% covariates) %>%
         fwrite(file.covars, sep='\t')        
     }
@@ -122,7 +126,11 @@ save_BETA <- function(df, out.file.head, pvar, vzs = TRUE, covariates = NULL, ve
     mutate(varID = paste(ID, ALT, sep='_'))
     
     if(verbose) snpnet::snpnetLogger(sprintf('Saving results to %s', file.geno), funcname='snpnetWrapper')
-        
+
+    if(file.exists(file.geno)){
+        file.rename(file.geno, paste0(out.file.head, ".", file.timestamp, ".tsv"))
+    }
+
     df %>% filter(! ID %in% covariates) %>%
     rename('varID' = 'ID') %>%
     left_join(pvar_df, by='varID') %>%
