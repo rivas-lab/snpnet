@@ -267,6 +267,16 @@ readPheMaster <- function(phenotype.file, psam.ids, family, covariates, phenotyp
         (!is.na(phe.master[[phenotype]])) &
         (phe.master$ID %in% psam.ids) # check if we have genotype
     ]
+    if(family == 'cox'){
+        # focus on individuals who does not have missing value in the status column
+        phe.no.missing.IDs <- intersect(
+            phe.no.missing.IDs,
+            phe.master$ID[
+              (!is.na(phe.master[[status]])) &
+              (phe.master[[status]] != -9) # in case missing status values were encoded with -9
+            ]
+        )
+    }
     if(!is.null(split.col)){
         # focus on individuals in training and validation set
         phe.no.missing.IDs <- intersect(
