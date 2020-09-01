@@ -28,14 +28,12 @@ cat <<- EOF
 	Run snpnet and compute PRS for all individuals in the plink2 pgen file.
 	(we will add evaluation, plot, etc. in the next update of the pipeline)
 	
-	Usage: $PROGNAME [options] genotype_pfile phe_file phenotype_name family results_dir
+	Usage: $PROGNAME [options] genotype_pfile phenotype_name results_dir
 	  genotype_pfile  The plink2 pgen/pvar.zst/psam file.
 	  phenotype_name  The name of the phenotype. We assume the phenotype is stored with the same column name
 	  results_dir     The results directory. The script will write the following files: 
-	                   - snpnet.RData       The results from snpnet::snpnet() function
 	                   - snpnet.tsv         The BETAs for genotypes
 	                   - snpnet.covars.tsv  The BETAs for covariates (when specified)
-	                   - results/ and meta/ The intermediate files from snpnet::snpnet(). (see --no_save)
 	
 	Options:
 	  --snpnet_dir       Specify the directory of the snpnet package

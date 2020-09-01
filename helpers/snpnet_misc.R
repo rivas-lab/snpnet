@@ -264,7 +264,7 @@ compute_mean <- function(df, percentile_col, phe_col, l_bin, u_bin){
         std_err = std_e,
         l_err = l_err,
         u_err = u_err,
-        mean_str = sprintf('%.3f (%.3f-%.3f)', mean, l_err, u_err),
+        mean_str = sprintf('%.3f (%.3f,%.3f)', mean, l_err, u_err),
         bin_str = paste0(100 * l_bin, '% - ', 100 * u_bin, '%'),
         stringsAsFactors=F
     ) %>%
@@ -312,7 +312,7 @@ compute_OR <- function(df, percentile_col, phe_col, l_bin, u_bin, cnt_middle){
         SE_LOR = se_LOR,
         l_OR = l_OR,
         u_OR = u_OR,
-        OR_str = sprintf('%.3f (%.3f-%.3f)', OR, l_OR, u_OR),
+        OR_str = sprintf('%.3f (%.3f,%.3f)', OR, l_OR, u_OR),
         bin_str = paste0(100 * l_bin, '% - ', 100 * u_bin, '%'),
         stringsAsFactors=F
     )
