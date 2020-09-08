@@ -3,7 +3,7 @@ set -beEuo pipefail
 
 SRCNAME=$(readlink -f $0)
 PROGNAME=$(basename $SRCNAME)
-VERSION="0.3.11"
+VERSION="0.3.12"
 NUM_POS_ARGS="3"
 
 source "$(dirname ${SRCNAME})/snpnet_misc.sh"
@@ -13,7 +13,7 @@ source "$(dirname ${SRCNAME})/snpnet_misc.sh"
 ############################################################
 
 show_default_helper () {
-    cat ${SRCNAME} | grep -n Default | tail -n+3 | awk -v FS=':' '{print $1}' | tr "\n" "\t" 
+    cat ${SRCNAME} | grep -n Default | tail -n+3 | awk -v FS=':' '{print $1}' | tr "\n" "\t"
 }
 
 show_default () {
@@ -27,19 +27,19 @@ cat <<- EOF
 	$PROGNAME (version $VERSION)
 	Run snpnet and compute PRS for all individuals in the plink2 pgen file.
 	(we will add evaluation, plot, etc. in the next update of the pipeline)
-	
+
 	Usage: $PROGNAME [options] genotype_pfile phenotype_name results_dir
 	  genotype_pfile  The plink2 pgen/pvar.zst/psam file.
 	  phenotype_name  The name of the phenotype. We assume the phenotype is stored with the same column name
-	  results_dir     The results directory. The script will write the following files: 
+	  results_dir     The results directory. The script will write the following files:
 	                   - snpnet.tsv         The BETAs for genotypes
 	                   - snpnet.covars.tsv  The BETAs for covariates (when specified)
-	
+
 	Options:
 	  --snpnet_dir       Specify the directory of the snpnet package
 	  --nCores     (-t)  Number of CPU cores
 	  --memory     (-m)  The memory amount
-	
+
 	Default configurations for snpnet (please use the options above to modify them):
 	  snpnet_dir=${snpnet_dir}
 EOF
@@ -66,9 +66,9 @@ mem=30000
 
 declare -a params=()
 for OPT in "$@" ; do
-    case "$OPT" in 
+    case "$OPT" in
         '-h' | '--help' )
-            usage >&2 ; exit 0 ; 
+            usage >&2 ; exit 0 ;
             ;;
         '-v' | '--version' )
             echo $VERSION ; exit 0 ;
@@ -98,7 +98,7 @@ done
 
 if [ ${#params[@]} -lt ${NUM_POS_ARGS} ]; then
     echo "${PROGNAME}: ${NUM_POS_ARGS} positional arguments are required" >&2
-    usage >&2 ; exit 1 ; 
+    usage >&2 ; exit 1 ;
 fi
 
 genotype_pfile="${params[0]}"
@@ -106,7 +106,7 @@ phenotype_name="${params[1]}"
 results_dir=$(readlink -f ${params[2]})
 
 ############################################################
-if [ ! -d ${results_dir} ] ; then 
+if [ ! -d ${results_dir} ] ; then
     echo "The specified results dir (${results_dir}) does not exist!" >&2
     exit 1
 fi

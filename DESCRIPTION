@@ -1,5 +1,5 @@
 Package: snpnet
-Version: 0.3.11
+Version: 0.3.12
 Type: Package
 Title: snpnet: Efficient Lasso Solver for Large SNP Data
 Authors@R: c(

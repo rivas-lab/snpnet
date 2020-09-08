@@ -3,7 +3,7 @@ set -beEuo pipefail
 
 SRCNAME=$(readlink -f $0)
 PROGNAME=$(basename $SRCNAME)
-VERSION="0.3.11"
+VERSION="0.3.12"
 NUM_POS_ARGS="5"
 
 source "$(dirname ${SRCNAME})/snpnet_misc.sh"
@@ -13,7 +13,7 @@ source "$(dirname ${SRCNAME})/snpnet_misc.sh"
 ############################################################
 
 show_default_helper () {
-    cat ${SRCNAME} | grep -n Default | tail -n+3 | awk -v FS=':' '{print $1}' | tr "\n" "\t" 
+    cat ${SRCNAME} | grep -n Default | tail -n+3 | awk -v FS=':' '{print $1}' | tr "\n" "\t"
 }
 
 show_default () {
@@ -27,18 +27,18 @@ cat <<- EOF
 	$PROGNAME (version $VERSION)
 	Run snpnet and compute PRS for all individuals in the plink2 pgen file.
 	(we will add evaluation, plot, etc. in the next update of the pipeline)
-	
+
 	Usage: $PROGNAME [options] genotype_pfile phe_file phenotype_name family results_dir
 	  genotype_pfile  The plink2 pgen/pvar.zst/psam file.
 	  phe_file        The phenotype file
 	  phenotype_name  The name of the phenotype. We assume the phenotype is stored with the same column name
 	  family          "gaussian", "binomial", or "cox"
-	  results_dir     The results directory. The script will write the following files: 
+	  results_dir     The results directory. The script will write the following files:
 	                   - snpnet.RData       The results from snpnet::snpnet() function
 	                   - snpnet.tsv         The BETAs for genotypes
 	                   - snpnet.covars.tsv  The BETAs for covariates (when specified)
 	                   - results/ and meta/ The intermediate files from snpnet::snpnet(). (see --no_save)
-	
+
 	Options:
 	  --snpnet_dir       Specify the directory of the snpnet package
 	  --nCores     (-t)  Number of CPU cores
@@ -56,7 +56,7 @@ cat <<- EOF
 	  --rank                Set rank=T
 	  --p_factor_file       Specify the R data file that contains the penalty factors
 
-	
+
 	Default configurations for snpnet (please use the options above to modify them):
 	  snpnet_dir=${snpnet_dir}
 EOF
@@ -98,9 +98,9 @@ p_factor_file="None"
 
 declare -a params=()
 for OPT in "$@" ; do
-    case "$OPT" in 
+    case "$OPT" in
         '-h' | '--help' )
-            usage >&2 ; exit 0 ; 
+            usage >&2 ; exit 0 ;
             ;;
         '-v' | '--version' )
             echo $VERSION ; exit 0 ;
@@ -121,37 +121,37 @@ for OPT in "$@" ; do
             alpha=$2 ; shift 2 ;
             ;;
         '-c' | '--covariates' )
-            covariates=$2 ; shift 2 ;            
+            covariates=$2 ; shift 2 ;
             ;;
         '-s' | '--split_col' )
-            split_col=$2 ; shift 2 ;            
+            split_col=$2 ; shift 2 ;
             ;;
         '--status_col' )
-            status_col=$2 ; shift 2 ;            
+            status_col=$2 ; shift 2 ;
             ;;
         '--keep' )
-            keep=$2 ; shift 2 ;            
+            keep=$2 ; shift 2 ;
             ;;
         '--no_save' )
-            save="F" ; shift 1 ;            
+            save="F" ; shift 1 ;
             ;;
         '--save_computeProduct' )
-            save_computeProduct="T" ; shift 1 ;            
+            save_computeProduct="T" ; shift 1 ;
             ;;
         '--verbose' )
-            verbose="T" ; KKT_verbose="T" ; shift 1 ;            
+            verbose="T" ; KKT_verbose="T" ; shift 1 ;
             ;;
         '--no_validation' )
-            validation="F" ; shift 1 ;            
+            validation="F" ; shift 1 ;
             ;;
         '--glmnetPlus' )
-            glmnetPlus="T" ; shift 1 ;            
+            glmnetPlus="T" ; shift 1 ;
             ;;
         '--rank' )
-            rank="T" ; shift 1 ;            
+            rank="T" ; shift 1 ;
             ;;
         '--p_factor_file' )
-            p_factor_file=$2 ; shift 2 ;            
+            p_factor_file=$2 ; shift 2 ;
             ;;
         '--'|'-' )
             shift 1 ; params+=( "$@" ) ; break
@@ -169,7 +169,7 @@ done
 
 if [ ${#params[@]} -lt ${NUM_POS_ARGS} ]; then
     echo "${PROGNAME}: ${NUM_POS_ARGS} positional arguments are required" >&2
-    usage >&2 ; exit 1 ; 
+    usage >&2 ; exit 1 ;
 fi
 
 genotype_pfile="${params[0]}"
@@ -216,6 +216,12 @@ echo "===================config_file===================" >&2
 cat ${config_file} >&2
 echo "===================config_file===================" >&2
 
-Rscript "$(dirname ${SRCNAME})/$(basename ${SRCNAME} .sh).R" "${config_file}"
+if [ ! -d ${results_dir} ] ; then mkdir -p ${results_dir} ; fi
 
-plink_score ${results_dir} ${phenotype_name} ${genotype_pfile} ${nCores} ${mem}
+if [ ! -f ${results_dir}/snpnet.RData ] ; then
+    Rscript "$(dirname ${SRCNAME})/$(basename ${SRCNAME} .sh).R" "${config_file}" 2>&1 | tee -a ${results_dir}/snpnet.log
+fi
+
+if [ ! -f ${results_dir}/${phenotype_name}.sscore.zst ] ; then
+    plink_score ${results_dir} ${phenotype_name} ${genotype_pfile} ${nCores} ${mem}
+fi
