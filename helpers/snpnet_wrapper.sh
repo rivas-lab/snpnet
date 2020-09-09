@@ -3,7 +3,7 @@ set -beEuo pipefail
 
 SRCNAME=$(readlink -f $0)
 PROGNAME=$(basename $SRCNAME)
-VERSION="0.3.13"
+VERSION="0.3.14"
 NUM_POS_ARGS="5"
 
 source "$(dirname ${SRCNAME})/snpnet_misc.sh"
@@ -55,7 +55,7 @@ cat <<- EOF
 	  --glmnetPlus          Set glmnetPlus=T
 	  --rank                Set rank=T
 	  --p_factor_file       Specify the R data file that contains the penalty factors
-
+	  --refit_from_RData    Specify a RData file from snpnet run to load the lambda sequence for the refit
 
 	Default configurations for snpnet (please use the options above to modify them):
 	  snpnet_dir=${snpnet_dir}
@@ -94,6 +94,7 @@ glmnetPlus=F
 vzs=T
 rank=F
 p_factor_file="None"
+refit_from_RData="None"
 ## == Default parameters (end) == ##
 
 declare -a params=()
@@ -153,6 +154,9 @@ for OPT in "$@" ; do
         '--p_factor_file' )
             p_factor_file=$2 ; shift 2 ;
             ;;
+        '--refit_from_RData' )
+            refit_from_RData=$2 ; shift 2 ;
+            ;;
         '--'|'-' )
             shift 1 ; params+=( "$@" ) ; break
             ;;
@@ -210,6 +214,7 @@ cat <<- EOF | tr " " "\t" > ${config_file}
 	rank ${rank}
 	vzs ${vzs}
 	p.factor.file ${p_factor_file}
+	refit_from_RData ${refit_from_RData}
 EOF
 
 echo "===================config_file===================" >&2
@@ -222,6 +227,6 @@ if [ ! -f ${results_dir}/snpnet.RData ] ; then
     Rscript "$(dirname ${SRCNAME})/$(basename ${SRCNAME} .sh).R" "${config_file}" 2>&1 | tee -a ${results_dir}/snpnet.log
 fi
 
-if [ ! -f ${results_dir}/${phenotype_name}.sscore.zst ] ; then
+if [ ! -f ${results_dir}/${phenotype_name}.sscore.zst ] && [ ! -f ${results_dir}/${phenotype_name}.sscore.log ] ; then
     plink_score ${results_dir} ${phenotype_name} ${genotype_pfile} ${nCores} ${mem}
 fi

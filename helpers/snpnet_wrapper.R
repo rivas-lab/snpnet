@@ -28,6 +28,7 @@ fit <- snpnet(
     family         = configs[['family']],
     covariates     = configs[['covariates']],
     alpha          = configs[['alpha']],
+    lambda         = configs[['lambda']],
     split.col      = configs[['split.col']],
     p.factor       = configs[['p.factor']],
     status.col     = configs[['status.col']],
@@ -39,16 +40,16 @@ save(fit, file = file.path(configs[['results.dir']], paste0("snpnet.RData")))
 # extract BETAs
 df <- snpnet_fit_to_df(
     fit$beta,
-    which.max(fit$metric.val),
+    ifelse(all(is.na(fit$metric.val)), length(fit$metric.train), which.max(fit$metric.val)),
     configs[['covariates']],
     configs[['verbose']]
 )
 
 save_BETA(
-    df, file.path(configs[['results.dir']], paste0("snpnet")), 
+    df, file.path(configs[['results.dir']], paste0("snpnet")),
     paste0(
-        configs[['genotype.pfile']], 
+        configs[['genotype.pfile']],
         '.pvar', ifelse(configs[['vzs']], '.zst', '')
-    ), 
+    ),
     configs[['vzs']], configs[['covariates']], configs[['verbose']]
 )

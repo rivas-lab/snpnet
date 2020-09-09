@@ -48,7 +48,14 @@ parse_covariates <- function(covariates_str){
     covariates
 }
 
+read_lambda_sequence_from_RData_file <- function(rdata_f){
+    load(rdata_f)
+    fit$full.lams[1:which.max(fit$metric.val)]
+}
+
 read_config_from_file <- function(config_file){
+    null_strs <- c('null', 'Null', 'NULL', 'none', 'None', 'NONE')
+
     config_df <- config_file %>% fread(header=T, sep='\t') %>%
     setnames(c('key', 'val'))
 
@@ -64,7 +71,7 @@ read_config_from_file <- function(config_file){
         config[[k]] <- as.logical(config[[k]])
     }
     for(key in c('status.col', 'covariates', 'split.col', 'keep')){
-        if( (! key %in% names(config)) | (config[[ key ]] %in% c('NULL', 'null', 'Null')) | is.na(config[[ key ]]) ){
+        if( (! key %in% names(config)) | (config[[ key ]] %in% null_strs) | is.na(config[[ key ]]) ){
             config[[ key ]] <- NULL
         }
     }
@@ -73,9 +80,10 @@ read_config_from_file <- function(config_file){
     config[['covariates']] = parse_covariates(config[['covariates']])
 
     if(
+        # read penalty factor from a RDS file
         ('p.factor.file' %in% names(config)) &&
         (! is.null(config[['p.factor.file']])) &&
-        (! config[['p.factor.file']] %in% c('null', 'Null', 'NULL', 'none', 'None', 'NONE'))
+        (! config[['p.factor.file']] %in% null_strs)
     ){
         config[['p.factor']] <- readRDS(
             config[['p.factor.file']]
@@ -83,6 +91,19 @@ read_config_from_file <- function(config_file){
     }else if (! 'p.factor' %in% names(config)) {
         config[['p.factor']] <- NULL
     }
+
+    if(
+        # for refit, read the lambda sequence from the specified RData file
+        ('refit_from_RData' %in% names(config)) &&
+        (! is.null(config[['refit_from_RData']])) &&
+        (! config[['refit_from_RData']] %in% null_strs)
+    ){
+        config[['lambda']] <- read_lambda_sequence_from_RData_file(config[['refit_from_RData']])
+        config[['split.col']] <- NULL
+    }else if (! 'lambda' %in% names(config)) {
+        config[['lambda']] <- NULL
+    }
+
     config
 }
 

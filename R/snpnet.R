@@ -99,8 +99,6 @@ snpnet <- function(genotype.pfile, phenotype.file, phenotype, family = NULL, cov
                    alpha = 1, nlambda = 100, lambda.min.ratio = ifelse(nobs < nvars, 0.01, 1e-04),
                    lambda = NULL, split.col = NULL, p.factor = NULL, status.col = NULL, mem = NULL,
                    configs = NULL) {
-
-  validation <- (!is.null(split.col))
   time.start <- Sys.time()
   snpnetLogger('Start snpnet', log.time = time.start)
 
@@ -121,7 +119,10 @@ snpnet <- function(genotype.pfile, phenotype.file, phenotype, family = NULL, cov
   ### --- infer family and update the configs --- ###
   if (is.null(family)) family <- inferFamily(phe[['master']], phenotype, status.col)
   configs <- updateConfigsWithFamily(configs, family)
-  if (configs[['verbose']]) print(configs)
+  if (configs[['verbose']]){
+    # dump the contents of configs object, except p.factor
+    print(configs[Filter(function(x){!x %in% c('p.factor')}, names(configs))])
+  }
 
   ### --- Check whether to use glmnet or glmnetPlus --- ###
   if (configs[['use.glmnetPlus']]) {
@@ -146,14 +147,15 @@ snpnet <- function(genotype.pfile, phenotype.file, phenotype, family = NULL, cov
   }
 
   ### --- Define the set of individual IDs for training (and validation) set(s) --- ###
-  if(is.null(split.col)){
-      splits <- c('train')
-      ids[['train']] <- phe[['master']]$ID
-  }else{
+  validation <- (!is.null(split.col))
+  if(validation){
       splits <- c('train', 'val')
       for(s in splits){
           ids[[s]] <- phe[['master']]$ID[ phe[['master']][[split.col]] == s ]
       }
+  }else{
+      splits <- c('train')
+      ids[['train']] <- phe[['master']]$ID
   }
 
   ### --- Prepare the feature matrix --- ###
