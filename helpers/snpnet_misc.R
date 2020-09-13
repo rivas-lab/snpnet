@@ -1,7 +1,14 @@
 suppressPackageStartupMessages(require(tidyverse))
 suppressPackageStartupMessages(require(data.table))
 
+cat_or_zcat <- function(f){
+    ifelse(endsWith(f, '.zst'), 'zstdcat', ifelse(endsWith(f, '.gz'), 'zcat', 'cat'))
+}
+
 config_params_data_type <- function(){
+    # This is a helper function for read_config_from_file().
+    # Here, we define the default data types so that we can properly parse
+    # the parameters specified in the config file.
     list(
         double = c(
             'missing.rate',
@@ -40,6 +47,8 @@ config_params_data_type <- function(){
 }
 
 parse_covariates <- function(covariates_str){
+    # Parse a string containing the set of covariates.
+    # We assume the covariate_str contains set of covariates separated with ','.
     if(is.null(covariates_str) || covariates_str == 'None'){
         covariates=c()
     }else{
@@ -49,11 +58,20 @@ parse_covariates <- function(covariates_str){
 }
 
 read_lambda_sequence_from_RData_file <- function(rdata_f){
+    # For the path to a given RData file (saved from a snpnet run with validation set),
+    # load the lambda sequence stored in the RData file and return the lambda sequence
+    # to the best lambda value (based on the validation set metric).
+    # This is useful for performing a "refit" using a combined set of training + validation set.
     load(rdata_f)
     fit$full.lams[1:which.max(fit$metric.val)]
 }
 
 read_config_from_file <- function(config_file){
+    # parse the 2-column config file for snpnet wrapper script
+    # and return as a named list.
+    # We parse the covariate string using parse_covariates() function
+    # and cast the data type based on the type definitions stored in
+    # config_params_data_type() function.
     null_strs <- c('null', 'Null', 'NULL', 'none', 'None', 'NONE')
 
     config_df <- config_file %>% fread(header=T, sep='\t') %>%
@@ -108,6 +126,7 @@ read_config_from_file <- function(config_file){
 }
 
 snpnet_fit_to_df <- function(beta, lambda_idx, covariates = NULL, verbose=FALSE){
+    # convert the regression coeffieicnets (betas) into a data frame.
     if(verbose) snpnet::snpnetLogger(sprintf('Extracting the BETAs (lambda idx: %d)..', lambda_idx), funcname='snpnetWrapper')
     # extract BETAs from snpnet(glmnet) fit as a data frame
     df <- beta[lambda_idx] %>% data.frame()
@@ -127,7 +146,12 @@ snpnet_fit_to_df <- function(beta, lambda_idx, covariates = NULL, verbose=FALSE)
     df %>% filter(ID %in% non.zero.BETAs)
 }
 
-save_BETA <- function(df, out.file.head, pvar, vzs = TRUE, covariates = NULL, verbose=FALSE){
+save_BETA <- function(df, out.file.head, pvar, covariates = NULL, verbose=FALSE){
+    # save the regression coefficients (betas) into file(s).
+    # we use up to 2 files corresponding to the betas for genetic variants as well as
+    # the ones for covariates (optional)
+    # For the genetic variants, we recover the information stored in the pvar[.zst] file and
+    # sort the results based on CHROM and POS columns.
     file.geno   <- paste0(out.file.head, ".tsv")
     file.covars <- paste0(out.file.head, ".covars.tsv")
     file.timestamp <- format(Sys.time(), format="%Y%m%d-%H%M%S")
@@ -141,9 +165,7 @@ save_BETA <- function(df, out.file.head, pvar, vzs = TRUE, covariates = NULL, ve
         fwrite(file.covars, sep='\t')
     }
 
-    catcmd <- ifelse(vzs, 'zstdcat', 'cat')
-
-    pvar_df <- fread(cmd=paste(catcmd, pvar, '| sed -e "s/^#//g"', sep=' ')) %>%
+    pvar_df <- fread(cmd=paste(cat_or_zcat(pvar), pvar, '| sed -e "s/^#//g"', sep=' ')) %>%
     mutate(varID = paste(ID, ALT, sep='_'))
 
     if(verbose) snpnet::snpnetLogger(sprintf('Saving results to %s', file.geno), funcname='snpnetWrapper')
@@ -159,105 +181,6 @@ save_BETA <- function(df, out.file.head, pvar, vzs = TRUE, covariates = NULL, ve
     select(c(colnames(pvar_df %>% select(-varID)), 'BETA')) %>%
     fwrite(file.geno, sep='\t')
 }
-
-compute_covar_score <- function(phe_df, covar_df){
-    phe_df %>%
-    mutate(ID = paste0(FID, '_', IID)) %>%
-    select(covar_df %>% select(ID) %>% pull() %>% c('ID')) %>%
-    column_to_rownames('ID') %>% as.matrix() %*%
-    as.matrix(covar_df %>% column_to_rownames('ID')) %>%
-    as.data.frame() %>%
-    rownames_to_column('ID') %>%
-    rename(covar_score = BETA) %>%
-    separate(ID, into=c('FID', 'IID'), sep='_') %>%
-    select(FID, IID, covar_score)
-}
-
-compute_score <- function(phe_df, covar_beta_file, geno_score_file){
-    covar_df <- fread(covar_beta_file, sep='\t', colClasses=c(ID="character", BETA="numeric"))
-
-    covar_score_df <- compute_covar_score(phe_df, covar_df)
-
-    fread(
-        cmd=paste0('cat ', geno_score_file, ' | sed -e "s/^#//g"'),
-        colClasses=c(FID="character", IID="character")
-    ) %>%
-    rename('geno_score' = 'SCORE1_SUM') %>%
-    select(FID, IID, geno_score) %>%
-    inner_join(covar_score_df, by=c('FID', 'IID')) %>%
-    mutate(score = geno_score + covar_score)
-}
-
-compute_auc <- function(df, split_str, score_col){
-    df_sub <- df %>%
-    filter(split == split_str & phe != -9) %>%
-    mutate(phe = as.factor(phe)) %>%
-    rename(auc_response = score_col)
-
-    auc(
-        df_sub %>% select(phe) %>% pull(),
-        df_sub %>% select(auc_response) %>% pull()
-    )
-}
-
-### old functions
-#
-# filter_by_percentile_and_count_phe <- function(df, p_l, p_u){
-#     df %>% filter(p_l < Percentile, Percentile <= p_u) %>%
-#     count(phe)
-# }
-
-# compute_OR <- function(df, l_bin, u_bin, cnt_middle){
-#     cnt_tbl <- df %>%
-#     filter_by_percentile_and_count_phe(l_bin, u_bin) %>%
-#     inner_join(cnt_middle, by='phe') %>% gather(bin, cnt, -phe) %>%
-#     arrange(-phe, bin)
-
-#     cnt_res <- cnt_tbl %>% mutate(cnt = as.numeric(cnt)) %>% select(cnt) %>% pull()
-#     names(cnt_res) <- c('n_TP', 'n_FN', 'n_FP', 'n_TN')
-
-#     OR <- (cnt_res[['n_TP']] * cnt_res[['n_TN']]) / (cnt_res[['n_FP']] * cnt_res[['n_FN']])
-#     LOR <- log(OR)
-#     se_LOR <- cnt_tbl %>% select(cnt) %>% pull() %>%
-#     lapply(function(x){1/x}) %>% reduce(function(x, y){x+y}) %>% sqrt()
-#     l_OR = exp(LOR - 1.96 * se_LOR)
-#     u_OR = exp(LOR + 1.96 * se_LOR)
-
-#     data.frame(
-#         l_bin = l_bin,
-#         u_bin = u_bin,
-#         n_TP = cnt_res[['n_TP']],
-#         n_FN = cnt_res[['n_FN']],
-#         n_FP = cnt_res[['n_FP']],
-#         n_TN = cnt_res[['n_TN']],
-#         OR   = OR,
-#         SE_LOR = se_LOR,
-#         l_OR = l_OR,
-#         u_OR = u_OR,
-#         OR_str = sprintf('%.3f (%.3f-%.3f)', OR, l_OR, u_OR)
-#     ) %>%
-#     mutate(OR_str = as.character(OR_str))
-# }
-
-# compute_OR_tbl <- function(df, split_str, score_col){
-#     all_ranked_df <- df %>% filter(split == split_str) %>%
-#     rename(auc_response = score_col) %>%
-#     mutate(Percentile = rank(-auc_response) / n()) %>%
-#     filter(phe != -9)
-
-#     cnt_middle <- all_ranked_df %>%
-#     filter_by_percentile_and_count_phe(0.4, 0.6) %>%
-#     rename('n_40_60' = 'n')
-
-#     bind_rows(lapply(1:20, function(x){
-#     compute_OR(all_ranked_df, (x-1)/20, x/20, cnt_middle)
-#     }),
-#     compute_OR(all_ranked_df, 0, .001, cnt_middle),
-#     compute_OR(all_ranked_df, 0, .01, cnt_middle),
-#     compute_OR(all_ranked_df, .99, 1, cnt_middle),
-#     compute_OR(all_ranked_df, .999, 1, cnt_middle)
-#     )
-# }
 
 # We incoporated the latest changes in the helper functions
 # https://github.com/rivas-lab/covid19/blob/a5592ae4f59da4479847c05338e7621dab6788cd/snpnet/functions.R#L89
@@ -309,6 +232,8 @@ compute_OR <- function(df, percentile_col, phe_col, l_bin, u_bin, cnt_middle){
     # we assume to have the phenotype counts in that bin (cnt_middle)
     cnt_tbl <- df %>%
     filter_by_percentile_and_count_phe(percentile_col, phe_col, l_bin, u_bin) %>%
+    bind_rows(cnt_middle %>% mutate(n = 0) %>% mutate(n = as.integer(n))) %>%
+    group_by(phe) %>% summarise(n = sum(n), .groups='drop') %>%
     inner_join(cnt_middle, by='phe') %>%
     gather(bin, cnt, -phe) %>% arrange(-phe, bin)
 
@@ -339,7 +264,8 @@ compute_OR <- function(df, percentile_col, phe_col, l_bin, u_bin, cnt_middle){
     )
 }
 
-compute_summary_OR_df <- function(df, percentile_col, phe_col, bins=((0:10)/10)){
+compute_summary_OR_df <- function(df, percentile_col, phe_col, bins=NULL){
+    if(is.null(bins)) bins <- ((0:10)/10)
     cnt_middle <- df %>%
     filter_by_percentile_and_count_phe(percentile_col, phe_col, 0.4, 0.6) %>%
     rename('n_40_60' = 'n')
@@ -351,7 +277,8 @@ compute_summary_OR_df <- function(df, percentile_col, phe_col, bins=((0:10)/10))
     bind_rows()
 }
 
-compute_summary_mean_df <- function(df, percentile_col, phe_col, bins=c(0, .0005, .01, (1:19)/20, .99, .9995, 1)){
+compute_summary_mean_df <- function(df, percentile_col, phe_col, bins=NULL){
+    if(is.null(bins)) bins <- c(0, .0005, .01, (1:19)/20, .99, .9995, 1)
     1:(length(bins)-1) %>%
     lapply(function(i){
         compute_mean(df, percentile_col, phe_col, bins[i], bins[i+1])
@@ -359,32 +286,96 @@ compute_summary_mean_df <- function(df, percentile_col, phe_col, bins=c(0, .0005
     bind_rows()
 }
 
-compute_summary_df <- function(df, percentile_col, phe_col, bins=c(0, .0005, .01, (1:19)/20, .99, .9995, 1), metric='mean'){
-    if(metric == 'mean'){
+compute_summary_df <- function(df, percentile_col, phe_col, bins=NULL, family='gaussian'){
+    if(family == 'gaussian'){
         compute_summary_mean_df(df, percentile_col, phe_col, bins)
-    }else if(metric == 'OR'){
+    }else if(family == 'binomial'){
         compute_summary_OR_df(df, percentile_col, phe_col, bins)
     }else{
-        stop(sprintf('metric %s is not supported!', metric))
+        stop(sprintf('%s family is not supported!', family))
     }
 }
 
 ### functions for plotting
 
-plot_PRS_vs_phe <- function(plot_df, plot_bin2d_x=0.05, plot_bin2d_y=NULL){
-    if(is.null(plot_bin2d_y)){
-        plot_bin2d_y <- diff(quantile(plot_df$pheno, c(.4, .6))) / 4
-    }
+plot_PRS_vs_phe <- function(plot_df, plot_bin2d_x=NULL, plot_bin2d_y=NULL, geno_score_col='geno_score', phe_col='phe', geno_z=TRUE){
+    # generate a 2d heatmap plot comparing the PRS (Z-score if geno_z == TRUE) vs phenotype.
+    # plot_df should contain PRS and phenotype columns for (typically test) set of individuals
+    # the column names can be specified in geno_score_col and phe_col
+    # the size of the mesh used in the density plot (bin2d) is determined based on
+    # the plot_bin2d_x and plot_bin2d_y parameters.
+
+    # rename the columns
     plot_df %>%
+    rename(!!'phe' := phe_col) %>%
+    rename(!!'geno_score' := geno_score_col) -> plot_dff
+
+    if(geno_z){
+        plot_dff %>% mutate(
+            geno_score_z = (geno_score - mean(geno_score)) / sd(geno_score)
+        ) -> plot_dff
+        if(is.null(plot_bin2d_x)) plot_bin2d_x <- 0.05
+    }else{
+        plot_dff %>% mutate(geno_score_z = geno_score) -> plot_dff
+        if(is.null(plot_bin2d_x)){
+            # compute the bin size for x-axis
+            plot_bin2d_x <- diff(quantile(plot_dff$geno_score, c(.4, .6))) / 4
+        }
+    }
+
+    if(is.null(plot_bin2d_y)){
+        # compute the bin size for y-axis
+        plot_bin2d_y <- diff(quantile(plot_dff$phe, c(.4, .6))) / 4
+    }
+
+    # plot the bin2d plot for the 99.9% coverage
+    plot_dff %>%
     filter(
         # 99.9% coverage
-        quantile(plot_df$pheno, .0005) < pheno,
-        quantile(plot_df$pheno, .9995) > pheno
+        quantile(plot_dff$phe, .0005) < phe,
+        quantile(plot_dff$phe, .9995) > phe
     ) %>%
-    ggplot(aes(x = SCORE_geno_z, y = pheno)) +
+    ggplot(aes(x = geno_score_z, y = phe)) +
     geom_bin2d(binwidth = c(plot_bin2d_x, plot_bin2d_y)) +
     scale_fill_continuous(type = "viridis") +
-    theme_bw()
+    theme_bw() +
+    labs(x = ifelse(geno_z, 'snpnet PRS (Z-score)', 'snpnet PRS'))
+}
+
+plot_PRS_binomial <- function(plot_df, geno_score_col='geno_score', phe_col='phe', geno_z=TRUE){
+    # generate Violin plot comparing the distribution of PRSs (Z-score if geno_z == TRUE)
+    # stratified by case/control status.
+    # plot_df should contain PRS and phenotype columns for (typically test) set of individuals
+    # the column names can be specified in geno_score_col and phe_col
+
+    # rename the columns
+    plot_df %>%
+    rename(!!'phe' := phe_col) %>%
+    rename(!!'geno_score' := geno_score_col) -> plot_dff
+
+    if(geno_z){
+        plot_dff %>% mutate(
+            geno_score_z = (geno_score - mean(geno_score)) / sd(geno_score)
+        ) -> plot_dff
+    }else{
+        plot_dff %>% mutate(geno_score_z = geno_score) -> plot_dff
+    }
+
+    plot_dff %>%
+    left_join(
+        data.frame(phe_str=c('control', 'case'), phe=c(1, 2), stringsAsFactors=F), by='phe'
+    ) %>%
+    ggplot(aes(x = reorder(as.factor(phe_str), phe), y = geno_score_z, color=as.factor(phe))) +
+    geom_violin() +
+    geom_boxplot(outlier.size = 0, outlier.stroke = 0, width = 0.2) +
+    stat_summary(
+        fun=mean, geom="errorbar",
+        aes(ymax = ..y.., ymin = ..y..),
+        width = 1.1, linetype = "dashed"
+    ) +
+    theme_bw()+
+    theme(legend.position = "none") +
+    labs(x = 'phenotype', y = ifelse(geno_z, 'snpnet PRS (Z-score)', 'snpnet PRS'))
 }
 
 plot_PRS_bin_vs_phe <- function(summary_plot_df, horizontal_line){
@@ -395,14 +386,18 @@ plot_PRS_bin_vs_phe <- function(summary_plot_df, horizontal_line){
     geom_errorbar(aes(ymin = l_err, ymax = u_err)) +
     geom_hline(yintercept = horizontal_line, color='gray')+
     theme_bw() +
-    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=.5))
+    theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=.5))+
+    labs(x = 'The percentile of snpnet PRS')
+}
+
+plot_PRS_bin_vs_OR <- function(summary_plot_df){
+    summary_plot_df %>%
+    mutate(mean = OR, l_err = l_OR, u_err = u_OR) %>%
+    plot_PRS_bin_vs_phe(1) +
+    labs(y = 'Odds ratio [SE]')
 }
 
 ## functions for additional evaluation
-
-cat_or_zcat <- function(f){
-    ifelse(endsWith(f, '.zst'), 'zstdcat', ifelse(endsWith(f, '.gz'), 'zcat', 'cat'))
-}
 
 read_PRS <- function(sscore_f){
     fread(
@@ -542,12 +537,7 @@ compute_phe_score_df <- function(phe_df, phenotype, sscore_f, snpnet_covar_BETAs
     phe_score_df
 }
 
-eval_performance <- function(phe_df, phenotype, sscore_f, snpnet_BETAs_f, snpnet_covar_BETAs_f, covariates, family, refit_split_strs=NULL){
-    compute_phe_score_df(
-        phe_df, phenotype, sscore_f, snpnet_covar_BETAs_f,
-        covariates, family, refit_split_strs
-    ) -> phe_score_df
-
+eval_performance <- function(phe_score_df, phenotype, snpnet_BETAs_f, family){
     if(family=='binomial'){
         # count the number of cases and controls
         phe_score_df %>% count(split, phe) %>%
@@ -560,7 +550,8 @@ eval_performance <- function(phe_df, phenotype, sscore_f, snpnet_BETAs_f, snpnet
         arrange(-n) -> split_cnt_df
     }
 
-    phe_score_df %>% build_eval_df((split_cnt_df %>% pull(split)), ifelse(family=='binomial', 'auc', 'r2')) %>%
+    phe_score_df %>%
+    build_eval_df((split_cnt_df %>% pull(split)), ifelse(family=='binomial', 'auc', 'r2')) %>%
     mutate(
         geno_delta = geno_covar - covar,
         phenotype_name = phenotype,

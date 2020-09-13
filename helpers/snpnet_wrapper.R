@@ -51,5 +51,5 @@ save_BETA(
         configs[['genotype.pfile']],
         '.pvar', ifelse(configs[['vzs']], '.zst', '')
     ),
-    configs[['vzs']], configs[['covariates']], configs[['verbose']]
+    configs[['covariates']], configs[['verbose']]
 )
