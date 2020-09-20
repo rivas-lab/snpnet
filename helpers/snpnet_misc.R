@@ -426,8 +426,17 @@ read_predicted_scores <- function(phe_df, sscore_f, snpnet_covar_BETAs_f, covari
     as.data.frame() %>%
     rownames_to_column('ID') %>%
     separate(ID, c('FID', 'IID'), sep = '_') %>%
-    rename('covar_score'='BETA') %>%
-    left_join(read_PRS(sscore_f), by=c('FID', 'IID')) %>%
+    rename('covar_score'='BETA') -> df
+
+    if(file.exists(sscore_f)){
+        df %>%
+        left_join(read_PRS(sscore_f), by=c('FID', 'IID')) -> df
+    }else{
+        # if the sscore file does not exist
+        df %>% mutate(geno_score = 0) -> df
+    }
+
+    df %>%
     select(FID, IID, geno_score, covar_score)
 }
 

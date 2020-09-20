@@ -227,6 +227,9 @@ if [ ! -f ${results_dir}/snpnet.RData ] ; then
     Rscript "$(dirname ${SRCNAME})/$(basename ${SRCNAME} .sh).R" "${config_file}" 2>&1 | tee -a ${results_dir}/snpnet.log
 fi
 
-if [ ! -f ${results_dir}/${phenotype_name}.sscore.zst ] && [ ! -f ${results_dir}/${phenotype_name}.sscore.log ] ; then
+if  [ $(cat ${results_dir}/snpnet.tsv | wc -l) -gt 1 ] &&
+    [ ! -f ${results_dir}/${phenotype_name}.sscore.zst ] &&
+    [ ! -f ${results_dir}/${phenotype_name}.sscore.log ] ; then
+
     plink_score ${results_dir} ${phenotype_name} ${genotype_pfile} ${nCores} ${mem}
 fi
