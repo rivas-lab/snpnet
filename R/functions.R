@@ -331,6 +331,7 @@ computeStats <- function(pfile, ids, configs) {
       # Run plink2 --geno-counts
       cmd_plink2 <- paste(
           configs[['plink2.path']],
+          '--silent',
           '--threads', configs[['nCores']],
           '--pfile', pfile, ifelse(configs[['vzs']], 'vzs', ''),
           '--keep', keep_f,
@@ -339,6 +340,7 @@ computeStats <- function(pfile, ids, configs) {
       )
       if (!is.null(configs[['mem']])) cmd_plink2 <- paste(cmd_plink2, '--memory', configs[['mem']])
 
+      snpnetLogger(sprintf('Running plink2: %s', cmd_plink2))
       system(cmd_plink2, intern=F, wait=T)
 
       # read the gcount file
@@ -415,6 +417,7 @@ computeProduct <- function(residual, pfile, vars, stats, configs, iter) {
   # Run plink2 --geno-counts
   cmd_plink2 <- paste(
     configs[['plink2.path']],
+    '--silent',
     '--threads', configs[['nCores']],
     '--pfile', pfile, ifelse(configs[['vzs']], 'vzs', ''),
     '--read-freq', paste0(configs[['gcount.full.prefix']], '.gcount'),
@@ -426,6 +429,7 @@ computeProduct <- function(residual, pfile, vars, stats, configs, iter) {
     cmd_plink2 <- paste(cmd_plink2, '--memory', as.integer(configs[['mem']]) - ceiling(sum(as.matrix(gc_res)[,2])))
   }
 
+  snpnetLogger(sprintf('Running plink2: %s', cmd_plink2))
   system(cmd_plink2, intern=F, wait=T)
 
   prod.full <- readBinMat(stringr::str_replace_all(residual_f, '.tsv$', '.vscore'), configs)
@@ -569,27 +573,42 @@ computeMetric <- function(pred, response, metric.type) {
 }
 
 checkEarlyStopping <- function(metric.val, max.valid.idx, iter, configs){
-    max.valid.idx.lag <- max.valid.idx-configs[['stopping.lag']]
-    max.val.1 <- max(metric.val[1:(max.valid.idx.lag)])
-    max.val.2 <- max(metric.val[(max.valid.idx.lag+1):max.valid.idx])
-    snpnetLogger(sprintf('stopping lag=%g, max.val.1=%g max.val.2=%g', max.valid.idx.lag, max.val.1, max.val.2))
-    if (
-        (configs[['early.stopping']]) &&
-        (max.valid.idx > configs[['stopping.lag']]) &&
-        (max.val.1 > max.val.2)
-    ) {
-        snpnetLogger(sprintf(
-            "Early stopped at iteration %d (Lambda idx=%d ) with validation metric: %.14f.",
-            iter, which.max(metric.val), max(metric.val, na.rm = T)
-        ))
-        snpnetLogger(paste0(
-            "Previous ones: ",
-            paste(metric.val[(max.valid.idx-configs[['stopping.lag']]+1):max.valid.idx], collapse = ", "),
-            "."
-        ), indent=1)
-        earlyStop <- TRUE
-    } else {
-        earlyStop <- FALSE
+    # max.valid.idx: the largest lambda index where the Lasso solution is valid
+    snpnetLogger('Checking the early stopping criteria.')
+    snpnetLogger(sprintf('Specifically, we check whether the validation metric (metric.val) reached maximal value and has been decreasing for at least %d models.', configs[['stopping.lag']]), indent=1)
+    snpnetLogger("Note: this is a configurable parameter. Please specify configs[['stopping.lag']].", indent=1)
+
+    # compute the max.valid.idx - lag
+    max.valid.idx.lag <- max.valid.idx - configs[['stopping.lag']]
+
+    if(max.valid.idx.lag < 1){
+      # we don't have sufficient number of valid models. Let's keep moving forward.
+      earlyStop <- FALSE
+    }else{
+      max.val.1 <- max(metric.val[1:(max.valid.idx.lag)])
+      max.val.2 <- max(metric.val[(max.valid.idx.lag+1):max.valid.idx])
+      # snpnetLogger(sprintf('stopping lag=%g, max.val.1=%g max.val.2=%g', max.valid.idx.lag, max.val.1, max.val.2))
+      snpnetLogger(sprintf('So far, we fit valid model(s) up to %d-th lambda value in the squence. We compare the following two values:', max.valid.idx))
+      snpnetLogger(sprintf('  max(metric.val[1:%d]) = %g', max.valid.idx.lag, max.val.1))
+      snpnetLogger(sprintf('  max(metric.val[%d:%d]) = %g', max.valid.idx.lag + 1, max.valid.idx, max.val.2))
+      if (
+          (configs[['early.stopping']]) &&
+          (max.valid.idx > configs[['stopping.lag']]) &&
+          (max.val.1 > max.val.2)
+      ) {
+          snpnetLogger(sprintf(
+              "Early stopped at iteration %d (Lambda idx=%d ) with validation metric: %.14f.",
+              iter, which.max(metric.val), max(metric.val, na.rm = T)
+          ))
+          snpnetLogger(paste0(
+              "Previous ones: ",
+              paste(metric.val[(max.valid.idx-configs[['stopping.lag']]+1):max.valid.idx], collapse = ", "),
+              "."
+          ), indent=1)
+          earlyStop <- TRUE
+      } else {
+          earlyStop <- FALSE
+      }
     }
     earlyStop
 }

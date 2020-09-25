@@ -3,7 +3,7 @@ set -beEuo pipefail
 
 SRCNAME=$(readlink -f $0)
 PROGNAME=$(basename $SRCNAME)
-VERSION="0.3.15"
+VERSION="0.3.17"
 NUM_POS_ARGS="3"
 
 source "$(dirname ${SRCNAME})/snpnet_misc.sh"
