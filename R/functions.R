@@ -183,14 +183,9 @@ predict_snpnet <- function(fit = NULL, saved_path = NULL, new_genotype_file, new
 #' @importFrom data.table set as.data.table
 #' @importFrom magrittr %>%
 #' @importFrom dplyr n
-prepareFeatures <- function(pgen, vars, names, stat) {
-  buf <- pgenlibr::ReadList(pgen, match(names, vars), meanimpute=F)
-  features.add <- as.data.table(buf)
-  colnames(features.add) <- names
-  for (j in 1:length(names)) {
-    set(features.add, i=which(is.na(features.add[[j]])), j=j, value=stat[["means"]][names[j]])
-  }
-  features.add
+prepareFeatures <- function(pgen, vars, names) {
+  plinkmatrix <- pgenlibr::PlinkMatrixFromPgen(pgen, match(names, vars), variant_names=names)
+  plinkmatrix
 }
 
 computeLambdas <- function(score, nlambda, lambda.min.ratio) {
@@ -381,7 +376,7 @@ readBinMat <- function(fhead, configs){
     cols <- data.table::fread(paste0(fhead, '.cols'), head=F)$V1
     bin.reader <- file(paste0(fhead, '.bin'), 'rb')
     M = matrix(
-        readBin(bin.reader, 'double', n=length(rows)*length(cols), endian = configs[['endian']]),
+        readBin(bin.reader, 'numeric', n=length(rows)*length(cols), size=4, endian = configs[['endian']]),
         nrow=length(rows), ncol=length(cols), byrow = T
     )
     close(bin.reader)
@@ -423,7 +418,7 @@ computeProduct <- function(residual, pfile, vars, stats, configs, iter) {
     '--read-freq', paste0(configs[['gcount.full.prefix']], '.gcount'),
     '--keep', residual_f,
     '--out', stringr::str_replace_all(residual_f, '.tsv$', ''),
-    '--variant-score', residual_f, 'zs', 'bin'
+    '--variant-score', residual_f, 'zs', 'bin4', 'single-prec'
   )
   if (!is.null(configs[['mem']])) {
     cmd_plink2 <- paste(cmd_plink2, '--memory', as.integer(configs[['mem']]) - ceiling(sum(as.matrix(gc_res)[,2])))
@@ -454,7 +449,8 @@ KKT.check <- function(residual, pfile, vars, n.train, current.lams, prev.lambda.
   time.KKT.check.start <- Sys.time()
   if (is.null(alpha)) alpha <- 1
   if (configs[['KKT.verbose']]) snpnetLogger('Start KKT.check()', indent=1, log.time=time.KKT.check.start)
-  prod.full <- computeProduct(residual, pfile, vars, stats, configs, iter) / n.train
+  # my version of residuals are already divided my n.train
+  prod.full <- computeProduct(residual, pfile, vars, stats, configs, iter)
 
   if(!is.null(p.factor)){
     prod.full <- sweep(prod.full, 1, p.factor, FUN="/")
