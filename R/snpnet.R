@@ -160,6 +160,7 @@ snpnet <- function(genotype.pfile, phenotype.file, phenotype, family = NULL, cov
 
   ### --- Prepare the feature matrix --- ###
   features <- list()
+  plinkfeature <- list()
   for(s in splits){
       phe[[s]] <- phe[['master']][match(ids[[s]], phe[['master']]$ID), ]
       rownames(phe[[s]]) <- phe[[s]]$ID
@@ -185,7 +186,11 @@ snpnet <- function(genotype.pfile, phenotype.file, phenotype, family = NULL, cov
   vars <- dplyr::mutate(dplyr::rename(data.table::fread(cmd=paste0(configs[['zstdcat.path']], ' ', paste0(genotype.pfile, '.pvar.zst'))), 'CHROM'='#CHROM'), VAR_ID=paste(ID, ALT, sep='_'))$VAR_ID
   pvar <- pgenlibr::NewPvar(paste0(genotype.pfile, '.pvar.zst'))
   pgen <- list()
-  for(s in splits) pgen[[s]] <- pgenlibr::NewPgen(paste0(genotype.pfile, '.pgen'), pvar=pvar, sample_subset=match(ids[[s]], ids[['psam']]))
+  samples_subset = list()
+  for(s in splits) {
+    samples_subset[[s]] <- match(ids[[s]], ids[['psam']])
+    pgen[[s]] <- pgenlibr::NewPgen(paste0(genotype.pfile, '.pgen'), pvar=pvar, sample_subset=samples_subset[[s]])
+  }
   pgenlibr::ClosePvar(pvar)
 
   stats <- computeStats(genotype.pfile, phe[['train']]$ID, configs = configs)
@@ -262,11 +267,11 @@ snpnet <- function(genotype.pfile, phenotype.file, phenotype, family = NULL, cov
     configs <- current.configs
     chr.to.keep <- setdiff(features.to.keep, covariates)
     for(s in splits){
+       tmp <- prepareFeatures(pgen[[s]], vars, chr.to.keep)
       if (!is.null(features[[s]])) {
-        features[[s]][, (chr.to.keep) := prepareFeatures(pgen[[s]], vars, chr.to.keep, stats)]
-      } else {
-        features[[s]] <- prepareFeatures(pgen[[s]], vars, chr.to.keep, stats)
+        tmp <- pgenlibr::setcovs(tmp, as.matrix(features[[s]]))
       }
+      plinkfeature[[s]] <- tmp
     }
     prev.max.valid.idx <- max.valid.idx
     snpnetLoggerTimeDiff("Time elapsed on loading back features", time.load.start)
@@ -283,30 +288,26 @@ snpnet <- function(genotype.pfile, phenotype.file, phenotype, family = NULL, cov
     num.lams <- min(num.lams + ifelse(lambda.idx >= num.lams-configs[["nlams.delta"]]/2, configs[["nlams.delta"]], 0),
                     configs[['nlambda']])   ## extend lambda list if necessary
     num.lams <- min(num.lams, lambda.idx + ifelse(is.null(num.new.valid), Inf, max(c(utils::tail(num.new.valid, 3), 1))))
-
+    features.left <- NULL
     ### --- Update the feature matrix --- ###
     if (configs[['verbose']]) snpnetLogger("Start updating feature matrix ...", indent=1)
     time.update.start <- Sys.time()
     if (iter > 1) {
-      features.to.discard <- setdiff(colnames(features[['train']]), features.to.keep)
-      if (length(features.to.discard) > 0) {
-          for(s in splits) features[[s]][, (features.to.discard) := NULL]
-      }
-      which.in.model <- which(names(score) %in% colnames(features[['train']]))
+      features.left <- intersect(plinkfeature[['train']]@colname, features.to.keep)
+      which.in.model <- which(names(score) %in% features.left)
       score[which.in.model] <- NA
     }
     if (!is.null(p.factor)) {score <- score/p.factor[names(score)]}
     sorted.score <- sort(score, decreasing = T, na.last = NA)
     if (length(sorted.score) > 0) {
       features.to.add <- names(sorted.score)[1:min(configs[['num.snps.batch']], length(sorted.score))]
+      chr.to.use <- c(setdiff(features.left, covariates), features.to.add)
       for(s in splits){
-        tmp.features.add <- prepareFeatures(pgen[[s]], vars, features.to.add, stats)
-        if (!is.null(features[[s]])) {
-          features[[s]][, colnames(tmp.features.add) := tmp.features.add]
-        } else {
-          features[[s]] <- tmp.features.add
-        }
-        rm(tmp.features.add)
+        tmp <- prepareFeatures(pgen[[s]], vars, chr.to.use)
+      if (!is.null(features[[s]])) {
+        tmp <- pgenlibr::setcovs(tmp, as.matrix(features[[s]]))
+      }
+        plinkfeature[[s]] <- tmp
       }
     } else {
       break
@@ -317,7 +318,7 @@ snpnet <- function(genotype.pfile, phenotype.file, phenotype, family = NULL, cov
     if (configs[['verbose']]) {
       snpnetLogger(paste0("- # ever-active variables: ", length(features.to.keep), "."), indent=2)
       snpnetLogger(paste0("- # newly added variables: ", length(features.to.add), "."), indent=2)
-      snpnetLogger(paste0("- Total # variables in the strong set: ", ncol(features[['train']]), "."), indent=2)
+      snpnetLogger(paste0("- Total # variables in the strong set: ", ncol(plinkfeature[['train']]), "."), indent=2)
     }
 
     # if (configs[['verbose']]) memoryProfile(features[['train']], message="features[['train']]")
@@ -331,20 +332,23 @@ snpnet <- function(genotype.pfile, phenotype.file, phenotype, family = NULL, cov
         }
     }
     if (is.null(p.factor)){
-      penalty.factor <- rep(1, ncol(features[['train']]))
+      penalty.factor <- rep(1, ncol(plinkfeature[['train']]))
       penalty.factor[seq_len(length(covariates))] <- 0
     } else {
-      penalty.factor <- c(rep(0, length(covariates)), p.factor[colnames(features[['train']])[-(1:length(covariates))]])
+      # The covariates are guaranteed to be the first variables
+      penalty.factor <- c(rep(0, length(covariates)), p.factor[(plinkfeature[['train']]@colname)[-(1:length(covariates))]])
     }
     current.lams <- full.lams[1:num.lams]
-    current.lams.adjusted <- full.lams[1:num.lams] * sum(penalty.factor) / length(penalty.factor)  # adjustment to counteract penalty factor normalization in glmnet
+    
+    # Do need for adjustment with myglmnet
+    #current.lams.adjusted <- full.lams[1:num.lams] * sum(penalty.factor) / length(penalty.factor)  # adjustment to counteract penalty factor normalization in glmnet
     time.glmnet.start <- Sys.time()
 
     if (configs[['use.glmnetPlus']]) {
       start.lams <- lambda.idx   # start index in the whole lambda sequence
       if (!is.null(prev.beta)) {
-        beta0 <- rep(1e-20, ncol(features[['train']]))
-        beta0[match(names(prev.beta), colnames(features[['train']]))] <- prev.beta
+        beta0 <- rep(1e-20, ncol(plinkfeature[['train']]))
+        beta0[match(names(prev.beta), plinkfeature[['train']]@colname)] <- prev.beta
       } else {
         beta0 <- prev.beta
       }
@@ -357,19 +361,15 @@ snpnet <- function(genotype.pfile, phenotype.file, phenotype, family = NULL, cov
           pred.train <- stats::predict(glmfit, newx = features[['train']])
           residual <- computeCoxgrad(pred.train, response[['train']], status[['train']])
       } else {
-          glmfit <- glmnetPlus::glmnet(
-              features[['train']], response[['train']], family = family, alpha = alpha,
-              lambda = current.lams.adjusted[start.lams:num.lams], penalty.factor = penalty.factor,
-              standardize = configs[['standardize.variant']], thresh = configs[['glmnet.thresh']],
-              type.gaussian = "naive", beta0 = beta0
+          glmfit <- myglmnet::myglmnet(
+              plinkfeature[['train']], response[['train']], family = family, alpha = alpha,
+              lambda = current.lams[start.lams:num.lams], penalty.factor = penalty.factor,
+              thresh = configs[['glmnet.thresh']], beta0 = beta0
           )
-          if(family=="gaussian"){
-              residual <- glmfit$residuals
-              pred.train <- response[['train']] - residual
-          }else{
-              pred.train <- stats::predict(glmfit, newx = as.matrix(features[['train']]), type = "response")
-              residual <- response[['train']] - pred.train
-          }
+          residual <- glmfit$residuals
+          pred.train <- myglmnet::PlinkPredict(glmfit, plinkfeature[['train']])
+          print(glmfit$npasses)
+
       }
 
     } else { # configs[['use.glmnetPlus']] == FALSE
@@ -413,6 +413,7 @@ snpnet <- function(genotype.pfile, phenotype.file, phenotype, family = NULL, cov
     )
     snpnetLogger("KKT check obj done ...", indent=1)
 
+
     # update the max valid index in the whole lambda sequence
     max.valid.idx <- check.obj[["max.valid.idx"]] + (start.lams - 1)
     lambda.idx <- max.valid.idx + 1
@@ -452,7 +453,7 @@ snpnet <- function(genotype.pfile, phenotype.file, phenotype, family = NULL, cov
         if (family == "cox") {
           pred.val <- stats::predict(glmfit, newx = as.matrix(features[['val']]), lambda = current.lams.adjusted[start.lams:max.valid.idx])
         } else if (configs[['use.glmnetPlus']]) {
-          pred.val <- glmnetPlus::predict.glmnet(glmfit, newx = as.matrix(features[['val']]), lambda = current.lams.adjusted[start.lams:max.valid.idx], type = "response")
+          pred.val <- myglmnet::PlinkPredict(glmfit, plinkfeature[['val']])
         } else {
           pred.val <- glmnet::predict.glmnet(glmfit, newx = as.matrix(features[['val']]), lambda = current.lams.adjusted[start.lams:max.valid.idx], type = "response")
         }
