@@ -469,7 +469,7 @@ snpnet <- function(genotype.pfile, phenotype.file, phenotype, family = NULL, cov
           metric.train[start.lams:max.valid.idx] <- computeMetric(pred.train[, 1:check.obj[["max.valid.idx"]], drop = F], response[['train']], configs[['metric']])
           if (validation){
               snpnetLogger('metric val.')
-              metric.val[start.lams:max.valid.idx] <- computeMetric(pred.val, response[['val']], configs[['metric']])
+              metric.val[start.lams:max.valid.idx] <- computeMetric(pred.val[, 1:check.obj[["max.valid.idx"]], drop = F], response[['val']], configs[['metric']])
           }
       }
 
