@@ -631,19 +631,6 @@ simplifyList_Col <- function(x) {
   return(x)
 }
 
-checkGlmnetPlus <- function(use.glmnetPlus, family) {
-    if (!requireNamespace("glmnet") && !requireNamespace("glmnetPlus"))
-        stop("Please install at least glmnet or glmnetPlus.")
-    if(is.null(use.glmnetPlus))
-        use.glmnetPlus <- (family == "gaussian")
-    if(use.glmnetPlus){
-        if (!requireNamespace("glmnetPlus")) {
-            warning("use.glmnetPlus was set to TRUE but glmnetPlus not found... Revert back to glmnet.")
-            use.glmnetPlus <- FALSE
-        }
-    }
-    use.glmnetPlus
-}
 
 setupConfigs <- function(configs, genotype.pfile, phenotype.file, phenotype, covariates, alpha, nlambda, split.col, p.factor, status.col, mem){
     out.args <- as.list(environment())
@@ -664,7 +651,6 @@ setupConfigs <- function(configs, genotype.pfile, phenotype.file, phenotype, cov
         keep = NULL,
         lambda.min.ratio = NULL,
         KKT.verbose = FALSE,
-        use.glmnetPlus = NULL,
         save = FALSE,
         save.computeProduct = FALSE,
         prevIter = 0,
@@ -714,7 +700,6 @@ setupConfigs <- function(configs, genotype.pfile, phenotype.file, phenotype, cov
 updateConfigsWithFamily <- function(configs, family){
     out <- configs
     out[['family']] <- family
-    out[['use.glmnetPlus']] <- checkGlmnetPlus(out[['use.glmnetPlus']], family)
     if (is.null(out[['metric']])) out[['metric']] <- setDefaultMetric(family)
     out
 }
