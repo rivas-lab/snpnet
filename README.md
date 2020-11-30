@@ -12,8 +12,8 @@ Most of the requirements of snpnet are available from CRAN. It also depends on t
 
 ```r
 library(devtools)
-install_github("junyangq/glmnetPlus")
+install_github("RuilinLi/myglmnet")
 install_github("chrchang/plink-ng", subdir="/2.0/cindex")
-install_github("chrchang/plink-ng", subdir="/2.0/pgenlibr")
+install_github("RuilinLi/plink-ng", subdir="/2.0/pgenlibr")
 ```
 We assume the users already have PLINK 2.0. Otherwise it can be installed from https://www.cog-genomics.org/plink/2.0/.
