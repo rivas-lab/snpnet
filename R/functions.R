@@ -142,9 +142,9 @@ predict_snpnet <- function(fit = NULL, saved_path = NULL, new_genotype_file, new
   for (split in split_name) {
     if (!is.null(covariates[[split]])) {
       features[[split]] <- data.table::data.table(covariates[[split]])
-      features[[split]][, (feature_names) := prepareFeatures(chr[[split]], vars, feature_names, stats)]
+      features[[split]][, (feature_names) := preparefloatFeatures(chr[[split]], vars, feature_names, stats)]
     } else {
-      features[[split]] <- prepareFeatures(chr[[split]], vars, feature_names, stats)
+      features[[split]] <- preparefloatFeatures(chr[[split]], vars, feature_names, stats)
     }
   }
 
@@ -183,6 +183,17 @@ predict_snpnet <- function(fit = NULL, saved_path = NULL, new_genotype_file, new
 #' @importFrom data.table set as.data.table
 #' @importFrom magrittr %>%
 #' @importFrom dplyr n
+preparefloatFeatures <- function(pgen, vars, names, stat) {
+  buf <- pgenlibr::ReadList(pgen, match(names, vars), meanimpute=F)
+  features.add <- as.data.table(buf)
+  colnames(features.add) <- names
+  for (j in 1:length(names)) {
+    set(features.add, i=which(is.na(features.add[[j]])), j=j, value=stat[["means"]][names[j]])
+  }
+  features.add
+}
+
+
 prepareFeatures <- function(pgen, vars, names) {
   plinkmatrix <- pgenlibr::PlinkMatrixFromPgen(pgen, match(names, vars), variant_names=names)
   plinkmatrix
