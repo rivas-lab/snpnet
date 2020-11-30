@@ -267,6 +267,14 @@ snpnet <- function(genotype.pfile, phenotype.file, phenotype, family = NULL, cov
       }
       plinkfeature[[s]] <- tmp
     }
+
+    # mean imputation for validation and test set should be based on the training set
+    # simple fix, but maybe a bit hacky?
+    for(s in splits){
+      if(s != "train"){
+        plinkfeature[[s]]@xim <- plinkfeature[["train"]]@xim
+      }
+    }
     prev.max.valid.idx <- max.valid.idx
     snpnetLoggerTimeDiff("Time elapsed on loading back features", time.load.start)
     earlyStopNow <- (validation && checkEarlyStopping(metric.val, max.valid.idx, configs[['prevIter']], configs))
@@ -303,6 +311,13 @@ snpnet <- function(genotype.pfile, phenotype.file, phenotype, family = NULL, cov
       }
         plinkfeature[[s]] <- tmp
       }
+
+      for(s in splits){
+        if(s != "train"){
+          plinkfeature[[s]]@xim <- plinkfeature[["train"]]@xim
+        }
+      }
+
     } else {
       break
     }
