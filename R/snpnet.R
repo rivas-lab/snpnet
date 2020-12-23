@@ -3,9 +3,9 @@
 #' Fit the entire lasso or elastic-net solution path using the Batch Screening Iterative Lasso (BASIL) algorithm
 #' on large phenotype-genotype datasets.
 #'
-#' Junyang Qian, Wenfei Du, Yosuke Tanigawa, Matthew Aguirre, Robert Tibshirani, Manuel A. Rivas, and Trevor Hastie.
-#' "A Fast and Flexible Algorithm for Solving the Lasso in Large-scale and Ultrahigh-dimensional Problems."
-#' bioRxiv (2019): https://doi.org/10.1101/630079
+#' Junyang Qian, Yosuke Tanigawa, Wenfei Du, Matthew Aguirre, Chris Chang, Robert Tibshirani, Manuel A. Rivas, Trevor Hastie.
+#' "A Fast and Scalable Framework for Large-Scale and Ultrahigh-Dimensional Sparse Regression with Application to the UK Biobank."
+#' PLOS Genetics. 16, e1009141 (2020). https://doi.org/10.1371/journal.pgen.1009141
 #'
 #' @usage snpnet(genotype.pfile, phenotype.file, phenotype, family = NULL, covariates = NULL, alpha
 #'   = 1, nlambda = 100, lambda.min.ratio = ifelse(nobs < nvars, 0.01, 1e-04), lambda = NULL,
@@ -320,6 +320,8 @@ snpnet <- function(genotype.pfile, phenotype.file, phenotype, family = NULL, cov
       snpnetLogger(paste0("- Total # variables in the strong set: ", ncol(features[['train']]), "."), indent=2)
     }
 
+    # if (configs[['verbose']]) memoryProfile(features[['train']], message="features[['train']]")
+
     ### --- Fit glmnet --- ###
     if (configs[['verbose']]){
         if(configs[['use.glmnetPlus']]){
@@ -397,6 +399,8 @@ snpnet <- function(genotype.pfile, phenotype.file, phenotype, family = NULL, cov
     rownames(residual) <- rownames(phe[['train']])
     colnames(residual) <- start.lams:num.lams
     if (configs[['verbose']]) snpnetLoggerTimeDiff("End fitting Glmnet.", time.glmnet.start, indent=2)
+
+    # if (configs[['verbose']]) memoryProfile(glmfit, message="glmfit")
 
     ### --- KKT Check --- ###
     if (configs[['verbose']]) snpnetLogger("Start checking KKT condition ...", indent=1)

@@ -5,7 +5,7 @@
 \title{Fit the Lasso/Elastic-Net for Large Phenotype-Genotype Datasets}
 \usage{
 snpnet(genotype.pfile, phenotype.file, phenotype, family = NULL, covariates = NULL, alpha
-  = 1, nlambda = 100, lambda.min.ratio = ifelse(nobs < nvars, 0.01, 1e-04), lambda = NULL, 
+  = 1, nlambda = 100, lambda.min.ratio = ifelse(nobs < nvars, 0.01, 1e-04), lambda = NULL,
   split.col = NULL, p.factor = NULL, status.col = NULL, mem = NULL, configs = NULL)
 }
 \arguments{
@@ -110,7 +110,7 @@ Fit the entire lasso or elastic-net solution path using the Batch Screening Iter
 on large phenotype-genotype datasets.
 }
 \details{
-Junyang Qian, Wenfei Du, Yosuke Tanigawa, Matthew Aguirre, Robert Tibshirani, Manuel A. Rivas, and Trevor Hastie.
-"A Fast and Flexible Algorithm for Solving the Lasso in Large-scale and Ultrahigh-dimensional Problems."
-bioRxiv (2019): https://doi.org/10.1101/630079
+Junyang Qian, Yosuke Tanigawa, Wenfei Du, Matthew Aguirre, Chris Chang, Robert Tibshirani, Manuel A. Rivas, Trevor Hastie.
+"A Fast and Scalable Framework for Large-Scale and Ultrahigh-Dimensional Sparse Regression with Application to the UK Biobank."
+PLOS Genetics. 16, e1009141 (2020). https://doi.org/10.1371/journal.pgen.1009141
 }

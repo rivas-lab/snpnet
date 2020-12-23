@@ -251,7 +251,8 @@ readPheMaster <- function(phenotype.file, psam.ids, family, covariates, phenotyp
 
     phe.master.unsorted <- data.table::fread(
       cmd=paste(cat_or_zcat(phenotype.file, configs), phenotype.file, ' | sed -e "s/^#//g"'),
-      colClasses = c("FID" = "character", "IID" = "character"), select = selectCols
+      colClasses = c("FID" = "character", "IID" = "character", setNames(rep('numeric', length(phenotype)), phenotype)),
+      select = selectCols
     )
     phe.master.unsorted$ID <- paste(phe.master.unsorted$FID, phe.master.unsorted$IID, sep = "_")
 
@@ -738,4 +739,14 @@ timeDiff <- function(start.time, end.time = NULL) {
 snpnetLoggerTimeDiff <- function(message, start.time, end.time = NULL, indent=0){
     if (is.null(end.time)) end.time <- Sys.time()
     snpnetLogger(paste(message, "Time elapsed:", timeDiff(start.time, end.time), sep=' '), log.time=end.time, indent=indent)
+}
+
+memoryProfile <- function(obj=NULL, message=''){
+  snpnetLogger(sprintf('start. %s', message), funcname='memoryProfile')
+  print(pryr::mem_used())
+  print(gc(full=F))
+  if(!is.null(obj)){
+    print(pryr::object_size(obj))
+  }
+  snpnetLogger('end', funcname='memoryProfile')
 }
