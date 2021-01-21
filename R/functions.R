@@ -24,6 +24,7 @@
 #' @param split_name Vector of split labels where prediction is to be made. Should be a combination of "train", "val", "test".
 #' @param idx Vector of lambda indices on which the prediction is to be made. If not provided, will predict on all lambdas found.
 #' @param family Type of the phenotype: "gaussian" for continuous phenotype and "binomial" for binary phenotype.
+#' @param status_col Name of the status column for Cox model.
 #' @param snpnet_prefix Prefix of the snpnet result files used to construct the full path. Only if `saved_path` is specified.
 #' @param snpnet_suffix Extension suffix of the snpnet result files used to construct the full path. Only if `saved_path` is specified.
 #' @param snpnet_subdir Name of the snpnet result subdirectory holding multiple result files for one phenotype. Only if `saved_path` is specified.
@@ -35,7 +36,7 @@
 predict_snpnet <- function(fit = NULL, saved_path = NULL, new_genotype_file, new_phenotype_file, phenotype,
                            gcount_path = NULL, meta_dir = NULL, meta_suffix = ".rda",
                            covariate_names = NULL, split_col = NULL, split_name = NULL, idx = NULL,
-                           family = NULL,
+                           family = NULL, status_col = NULL,
                            snpnet_prefix = "output_iter_", snpnet_suffix = ".RData", snpnet_subdir = "results",
                            configs = list(zstdcat.path = "zstdcat", zcat.path='zcat')) {
 
@@ -83,6 +84,12 @@ predict_snpnet <- function(fit = NULL, saved_path = NULL, new_genotype_file, new
     beta <- fit$beta
     stats <- fit$stats
   }
+  if(length(a0[[1]]) == 0){
+    # No intercept
+    for(i in (1:length(a0))){
+      a0[[i]] = 0
+    }
+  }
 
   feature_names <- unique(unlist(sapply(beta, function(x) names(x[x != 0]))))
   feature_names <- setdiff(feature_names, covariate_names)
@@ -91,14 +98,14 @@ predict_snpnet <- function(fit = NULL, saved_path = NULL, new_genotype_file, new
   ids <- list()
   ids[["psam"]] <- readIDsFromPsam(paste0(new_genotype_file, '.psam'))
 
-  phe_master <- readPheMaster(new_phenotype_file, ids[['psam']], family, covariate_names, phenotype, NULL, split_col, configs)
+  phe_master <- readPheMaster(new_phenotype_file, ids[['psam']], family, covariate_names, phenotype, status_col, split_col, configs)
   if (length(covariate_names) > 0) {
     cov_master <- as.matrix(phe_master[, covariate_names, with = F])
     cov_no_missing <- apply(cov_master, 1, function(x) all(!is.na(x)))
     phe_master <- phe_master[cov_no_missing, ]
   }
 
-  if (is.null(family)) family <- inferFamily(phe_master, phenotype, NULL)
+  if (is.null(family)) family <- inferFamily(phe_master, phenotype, status_col)
   if (is.null(configs[["metric"]])) configs[["metric"]] <- setDefaultMetric(family)
 
   if (is.null(split_col)) {
@@ -160,6 +167,10 @@ predict_snpnet <- function(fit = NULL, saved_path = NULL, new_genotype_file, new
   response <- list()
   for (split in split_name) {
     response[[split]] <- phe[[split]][[phenotype]]
+    if(family == "cox"){
+      status_local <- phe[[split]][[status_col]]
+      response[[split]] <- survival::Surv(response[[split]], status_local)
+    }
   }
 
   for (split in split_name) {
