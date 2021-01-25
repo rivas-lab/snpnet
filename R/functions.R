@@ -174,7 +174,8 @@ predict_snpnet <- function(fit = NULL, saved_path = NULL, new_genotype_file, new
   }
 
   for (split in split_name) {
-    for (i in idx) {
+    for (i_0 in (1:length(idx))) {
+      i = idx[i_0]
       active_names <- names(beta[[i]])[beta[[i]] != 0]
       if (length(active_names) > 0) {
         features_single <- as.matrix(features[[split]][, active_names, with = F])
@@ -182,7 +183,7 @@ predict_snpnet <- function(fit = NULL, saved_path = NULL, new_genotype_file, new
         features_single <- matrix(0, nrow(features[[split]]), 0)
       }
       pred_single <- a0[[i]] + features_single %*% beta[[i]][active_names]
-      pred[[split]][, i] <- as.matrix(pred_single)
+      pred[[split]][, i_0] <- as.matrix(pred_single)
     }
     metric[[split]] <- computeMetric(pred[[split]], response[[split]], configs[["metric"]])
   }
