@@ -163,31 +163,34 @@ sparse_snpnet <- function(genotype.pfile, phenotype.file, phenotype, group_map, 
         glmmod <- stats::glm(stats::as.formula(paste(phenotype, " ~ ", paste(c(1, 
             covariates), collapse = " + "))), data = phe[["train"]], family = family)
     }
-
-    proxObj = pgenlibr::NewProxObj(nrow(snps_to_use), gene_cumu)
+    
+    proxObj <- pgenlibr::NewProxObj(nrow(snps_to_use), gene_cumu)
     
     
     gaussian_response_sd <- NULL
     responseObj <- NULL
     offset <- list()
     # Run linear prediction
+    
+    for (s in splits) {
+        offset[[s]] <- stats::predict(glmmod, phe[[s]] %>% dplyr::select(all_of(covs)))
+    }
     if (family == "gaussian") {
-        gaussian_response_sd = sd(glmmod$residuals)
-        responseObj = pgenlibr::NewResponseObj(glmmod$residuals/gaussian_response_sd, "gaussian")
+        gaussian_response_sd <- sd(glmmod$residuals)
+        responseObj <- pgenlibr::NewResponseObj(glmmod$residuals/gaussian_response_sd, 
+            "gaussian")
     } else {
-        for (s in split) {
-            offset[[s]] <- stats::predict(glmmod, phe[[s]] %>% dplyr::select(all_of(covs)))
-        }
-       # Figure this out later
+        
+        # Figure this out later
     }
     
-
+    
     time.load.matrix <- Sys.time()
-    snpnetLogger("Start loading training genotype matrix", log.time = time.start)
+    snpnetLogger("Start loading training genotype matrix")
     
     Xtrain <- pgenlibr::NewSparse(pgen[["train"]], snps_to_use$index)
     snpnetLoggerTimeDiff("End loading genotype matrix", time.load.matrix, indent = 1)
-
+    
     if (is.null(lambda)) {
         lambda.max <- pgenlibr::ComputeLambdaMax(Xtrain, responseObj, gene_cumu)
         full.lams <- exp(seq(from = log(lambda.max), to = log(lambda.max * lambda.min.ratio), 
@@ -195,22 +198,82 @@ sparse_snpnet <- function(genotype.pfile, phenotype.file, phenotype, group_map, 
     } else {
         full.lams <- lambda
     }
-
-    outer.idx = 1
-    num.lambda.finished = 0
-
-    # while(num.lambda.finished < length(full.lams)){
-
-    # }
     
-    start <- Sys.time()
-    #result <- pgenlibr::SparseTest123(Xtrain, response[["train"]], gene_cumu, full.lams[1:30])
-    print(proxObj)
-    result <- pgenlibr::FitGroupLasso(Xtrain, proxObj, responseObj,full.lams[1:16])
-    print(Sys.time() - start)
-    print(proxObj)
-    result2 <- pgenlibr::FitGroupLasso(Xtrain, proxObj, responseObj,full.lams[17:30])
-    print(Sys.time() - start)
-    return(0)
+    metric.train <- rep(NA, length(full.lams))
+    metric.val <- rep(NA, length(full.lams))
+    max.metric.val <- -1
+    
+    
+    if (validation) {
+        lambda_schedule <- round(c(0, 0.02, 0.3, 0.5, 0.6, 0.7, 0.8, 0.9, 1) * length(full.lams))
+    } else {
+        lambda_schedule <- c(0, length(full.lams))
+    }
+    
+    for (i in 1:(length(lambda_schedule) - 1)) {
+        time.iter <- Sys.time()
+        snpnetLogger(paste("Iteration", i))
+        lambda_start_ind <- lambda_schedule[i] + 1
+        lambda_end_ind <- lambda_schedule[i + 1]
+        lambda_this_iter <- full.lams[lambda_start_ind:lambda_end_ind]
+        result <- pgenlibr::FitGroupLasso(Xtrain, proxObj, responseObj, lambda_this_iter)
+        
+        snpnetLogger("Evaluating training metric")
+        ### Compute training metric
+        pred.train = matrix(nrow=length(response[["train"]]), ncol=ncol(result))
+        for (j in 1:(ncol(result))) {
+            pred.train[, j] <- pgenlibr::SparseMultv(Xtrain, result[, j])
+        }
+        if (family == "gaussian") {
+            pred.train <- pred.train * gaussian_response_sd
+        }
+
+        pred.train <- sweep(pred.train, 1,  offset[["train"]], "+")  
+        metric.train[lambda_start_ind:lambda_end_ind] <- computeMetric(pred.train, response[["train"]], 
+            configs[["metric"]])
+        
+        if (validation) {
+            snpnetLogger("Evaluating validation metric")
+            nnz_ind <- integer(0)
+            for (j in 1:(ncol(result))) {
+                nnz_ind <- union(nnz_ind, which(result[, j] != 0))
+            }
+            nnz_ind <- sort(nnz_ind)
+            Xval <- pgenlibr::NewDense(pgen[["val"]], snps_to_use$index[nnz_ind], 
+                snps_to_use$stats_means[nnz_ind])
+            pred.val = matrix(nrow=length(response[["val"]]), ncol=ncol(result))
+            for (j in 1:(ncol(result))) {
+                beta_local <- result[nnz_ind, j]
+                pred.val[,j] <- pgenlibr::DenseMultv(Xval, beta_local)
+            }
+
+            if (family == "gaussian") {
+                pred.val <- pred.val * gaussian_response_sd
+            }
+            pred.val <- sweep(pred.val, 1,  offset[["val"]], "+")  
+            metric.val[lambda_start_ind:lambda_end_ind] <- computeMetric(pred.val, response[["val"]], 
+                configs[["metric"]])
+            
+            print(metric.train)
+            print(metric.val)
+            
+            max.metric.val <- max(metric.val, na.rm = T)
+            if (metric.val[lambda_end_ind] < max.metric.val) {
+                snpnetLogger("Early stopping condition reached")
+                break
+            }
+        }
+        snpnetLoggerTimeDiff(paste("Iteration", i, "done"), time.iter, indent = 1)
+    }
+    
+    
+    
+    # start <- Sys.time() #result <- pgenlibr::SparseTest123(Xtrain,
+    # response[['train']], gene_cumu, full.lams[1:30]) print(proxObj) result <-
+    # pgenlibr::FitGroupLasso(Xtrain, proxObj, responseObj,full.lams[1:16])
+    # print(Sys.time() - start) print(proxObj) result2 <-
+    # pgenlibr::FitGroupLasso(Xtrain, proxObj, responseObj,full.lams[17:30])
+    # print(Sys.time() - start)
+    return(list(metric.train, metric.val))
     
 }
