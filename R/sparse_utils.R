@@ -37,3 +37,18 @@ computeSparseStats <- function(pfile, ids, configs) {
     }
     gcount_df
 }
+
+
+getCoxResponseObj <- function(surv, offset=NULL) {
+    ord <- order(surv[,1])
+    sorted_y <- surv[ord,1]
+    rankmin <- rank(sorted_y, ties.method='min') - 1L
+    rankmax <- rank(sorted_y, ties.method='max') - 1L
+    ord <- ord - 1L
+    normalized_status <- surv[,2]/sum(surv[,2])
+    if((!is.null(offset)) && (length(offset) !=  nrow(surv))) {
+        stop("offset does not have the same size as the surv object")
+    }
+    cox_obj <- pgenlibr::NewCoxResponseObj(normalized_status, ord, rankmin, rankmax, offset)
+    cox_obj
+}

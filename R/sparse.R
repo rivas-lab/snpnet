@@ -157,11 +157,24 @@ sparse_snpnet <- function(genotype.pfile, phenotype.file, phenotype, group_map, 
     
     
     ### --- Fit a model using only the covariates
+    offset <- list()
     if (family == "cox") {
-        stop("I will implement this later")
+        predictors = as.matrix(phe[['train']] %>%  dplyr::select(all_of(covs)))
+        glmmod <- myglmnet::myglmnet(predictors, response[['train']], family="cox", standardize=F, lambda=c(0))
+        offset[['train']] <- as.double(predictors %*% glmmod$beta)
+        #print(computeMetric(as.matrix(offset[['train']]), response[['train']], configs[["metric"]]))
+        if(validation) {
+            offset[['val']] <-  as.matrix(phe[['val']] %>%  dplyr::select(all_of(covs))) %*% glmmod$beta
+            #print(computeMetric(as.matrix(offset[['val']]), response[['val']], configs[["metric"]]))
+        }
     } else {
         glmmod <- stats::glm(stats::as.formula(paste(phenotype, " ~ ", paste(c(1, 
             covariates), collapse = " + "))), data = phe[["train"]], family = family)
+        # for(s in splits){
+        #     metric = computeMetric(as.matrix(stats::predict(glmmod, phe[[s]] %>% dplyr::select(all_of(covs)))), response[[s]], 
+        #     configs[["metric"]])
+        #     print(paste("split", s, "metric", metric))
+        # }
     }
     
     proxObj <- pgenlibr::NewProxObj(nrow(snps_to_use), gene_cumu)
@@ -169,19 +182,21 @@ sparse_snpnet <- function(genotype.pfile, phenotype.file, phenotype, group_map, 
     
     gaussian_response_sd <- NULL
     responseObj <- NULL
-    offset <- list()
     # Run linear prediction
-    
-    for (s in splits) {
-        offset[[s]] <- stats::predict(glmmod, phe[[s]] %>% dplyr::select(all_of(covs)))
+    if(family != "cox"){
+        for (s in splits) {
+            offset[[s]] <- stats::predict(glmmod, phe[[s]] %>% dplyr::select(all_of(covs)))
+        }
     }
+
     if (family == "gaussian") {
         gaussian_response_sd <- sd(glmmod$residuals)
         responseObj <- pgenlibr::NewResponseObj(glmmod$residuals/gaussian_response_sd, 
             "gaussian")
-    } else {
-        
-        # Figure this out later
+    } else if (family == "binomial") {
+        responseObj <- pgenlibr::NewResponseObj(response[['train']], "binomial", offset[['train']])
+    } else if (family == "cox") {
+        responseObj <- getCoxResponseObj(response[['train']], offset[['train']])
     }
     
     
@@ -189,6 +204,9 @@ sparse_snpnet <- function(genotype.pfile, phenotype.file, phenotype, group_map, 
     snpnetLogger("Start loading training genotype matrix")
     
     Xtrain <- pgenlibr::NewSparse(pgen[["train"]], snps_to_use$index)
+    if(validation){
+        Xval <- pgenlibr::NewDense(pgen[["val"]], snps_to_use$index, snps_to_use$stats_means)
+    }
     snpnetLoggerTimeDiff("End loading genotype matrix", time.load.matrix, indent = 1)
     
     if (is.null(lambda)) {
@@ -205,11 +223,13 @@ sparse_snpnet <- function(genotype.pfile, phenotype.file, phenotype, group_map, 
     
     
     if (validation) {
-        lambda_schedule <- round(c(0, 0.02, 0.3, 0.5, 0.6, 0.7, 0.8, 0.9, 1) * length(full.lams))
+        lambda_schedule <- round(c(0, 0.02, 0.05*(1:20)) * length(full.lams))
     } else {
         lambda_schedule <- c(0, length(full.lams))
     }
     
+    beta = NULL
+
     for (i in 1:(length(lambda_schedule) - 1)) {
         time.iter <- Sys.time()
         snpnetLogger(paste("Iteration", i))
@@ -217,7 +237,7 @@ sparse_snpnet <- function(genotype.pfile, phenotype.file, phenotype, group_map, 
         lambda_end_ind <- lambda_schedule[i + 1]
         lambda_this_iter <- full.lams[lambda_start_ind:lambda_end_ind]
         result <- pgenlibr::FitGroupLasso(Xtrain, proxObj, responseObj, lambda_this_iter)
-        
+        beta <- cbind(beta, result)
         snpnetLogger("Evaluating training metric")
         ### Compute training metric
         pred.train = matrix(nrow=length(response[["train"]]), ncol=ncol(result))
@@ -234,17 +254,9 @@ sparse_snpnet <- function(genotype.pfile, phenotype.file, phenotype, group_map, 
         
         if (validation) {
             snpnetLogger("Evaluating validation metric")
-            nnz_ind <- integer(0)
-            for (j in 1:(ncol(result))) {
-                nnz_ind <- union(nnz_ind, which(result[, j] != 0))
-            }
-            nnz_ind <- sort(nnz_ind)
-            Xval <- pgenlibr::NewDense(pgen[["val"]], snps_to_use$index[nnz_ind], 
-                snps_to_use$stats_means[nnz_ind])
             pred.val = matrix(nrow=length(response[["val"]]), ncol=ncol(result))
             for (j in 1:(ncol(result))) {
-                beta_local <- result[nnz_ind, j]
-                pred.val[,j] <- pgenlibr::DenseMultv(Xval, beta_local)
+                pred.val[,j] <- pgenlibr::DenseMultv(Xval, result[, j])
             }
 
             if (family == "gaussian") {
@@ -259,14 +271,14 @@ sparse_snpnet <- function(genotype.pfile, phenotype.file, phenotype, group_map, 
             
             max.metric.val <- max(metric.val, na.rm = T)
             if (metric.val[lambda_end_ind] < max.metric.val) {
-                snpnetLogger("Early stopping condition reached")
+                snpnetLoggerTimeDiff("Early stopping condition reached", time.start, indent = 1)
                 break
             }
         }
         snpnetLoggerTimeDiff(paste("Iteration", i, "done"), time.iter, indent = 1)
     }
     
-    
+    rownames(beta) <- snps_to_use$original_ID
     
     # start <- Sys.time() #result <- pgenlibr::SparseTest123(Xtrain,
     # response[['train']], gene_cumu, full.lams[1:30]) print(proxObj) result <-
@@ -274,6 +286,6 @@ sparse_snpnet <- function(genotype.pfile, phenotype.file, phenotype, group_map, 
     # print(Sys.time() - start) print(proxObj) result2 <-
     # pgenlibr::FitGroupLasso(Xtrain, proxObj, responseObj,full.lams[17:30])
     # print(Sys.time() - start)
-    return(list(metric.train, metric.val))
+    return(list(beta=beta, covs_fit=glmmod, snps_used=snps_to_use, metric.train=metric.train, metric.val=metric.val))
     
 }

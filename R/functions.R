@@ -261,11 +261,7 @@ readPlinkKeepFile <- function(keep_file){
 #'
 #' @export
 readPheMaster <- function(phenotype.file, psam.ids, family, covariates, phenotype, status, split.col, configs){
-    if(!is.null(family) && family == 'cox'){
-        selectCols <- c("FID", "IID", covariates, phenotype, status, split.col)
-    } else{
-        selectCols <- c("FID", "IID", covariates, phenotype, split.col)
-    }
+    selectCols <- c("FID", "IID", covariates, phenotype, status, split.col)
 
     phe.master.unsorted <- data.table::fread(
       cmd=paste(cat_or_zcat(phenotype.file, configs), phenotype.file, ' | sed -e "s/^#//g"'),
