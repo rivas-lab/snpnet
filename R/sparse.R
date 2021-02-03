@@ -1,7 +1,7 @@
 #' @export
 sparse_snpnet <- function(genotype.pfile, phenotype.file, phenotype, group_map, family = NULL, 
     covariates = NULL, nlambda = 100, lambda.min.ratio = 0.01, lambda = NULL, split.col = NULL, 
-    p.factor = NULL, status.col = NULL, mem = NULL, configs = NULL) {
+    p.factor = NULL, status.col = NULL, mem = NULL, configs = NULL, variant_filter=NULL) {
     time.start <- Sys.time()
     snpnetLogger("Start snpnet", log.time = time.start)
     
@@ -98,6 +98,12 @@ sparse_snpnet <- function(genotype.pfile, phenotype.file, phenotype, group_map, 
     snps_to_use <- snps_to_use %>% dplyr::select(c("#CHROM", "POS", "original_ID", 
         "index", "NON_REF_CT", "stats_means")) %>% tidyr::separate(original_ID, into = c("CHROM", 
         "POS"), sep = ":", remove = FALSE, convert = TRUE, extra = "drop")
+
+    if(!is.null(variant_filter)) {
+        vfilter = data.table::fread(variant_filter, select="ID")
+        browser()
+        snps_to_use <- snps_to_use %>% dplyr::filter(original_ID %in% vfilter$ID)
+    }
     
     ### Temporary solution, the mapping file must have these columns
     gene_map <- data.table::fread(group_map, select = c("#CHROM", "POS", "SYMBOL", 
@@ -136,7 +142,7 @@ sparse_snpnet <- function(genotype.pfile, phenotype.file, phenotype, group_map, 
     
     # Only use autosome
     snps_to_use <- snps_to_use %>% dplyr::filter(CHROM < 23) %>% dplyr::filter(gene != 
-        "")
+        "" & (Csq %in% c("ptv", "pav")))
     # snps_to_use = snps_to_use %>% filter(Csq %in% c('ptv', 'pav'))
     
     genes_with_comma <- grepl(",", snps_to_use$gene, fixed = TRUE)
