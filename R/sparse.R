@@ -237,15 +237,15 @@ sparse_snpnet <- function(genotype.pfile, phenotype.file, phenotype, group_map, 
         lambda_end_ind <- lambda_schedule[i + 1]
         lambda_this_iter <- full.lams[lambda_start_ind:lambda_end_ind]
         result <- pgenlibr::FitGroupLasso(Xtrain, proxObj, responseObj, lambda_this_iter)
+        if(family == "gaussian") {
+            result = result * gaussian_response_sd
+        }
         beta <- cbind(beta, result)
         snpnetLogger("Evaluating training metric")
         ### Compute training metric
         pred.train = matrix(nrow=length(response[["train"]]), ncol=ncol(result))
         for (j in 1:(ncol(result))) {
             pred.train[, j] <- pgenlibr::SparseMultv(Xtrain, result[, j])
-        }
-        if (family == "gaussian") {
-            pred.train <- pred.train * gaussian_response_sd
         }
 
         pred.train <- sweep(pred.train, 1,  offset[["train"]], "+")  
@@ -259,9 +259,6 @@ sparse_snpnet <- function(genotype.pfile, phenotype.file, phenotype, group_map, 
                 pred.val[,j] <- pgenlibr::DenseMultv(Xval, result[, j])
             }
 
-            if (family == "gaussian") {
-                pred.val <- pred.val * gaussian_response_sd
-            }
             pred.val <- sweep(pred.val, 1,  offset[["val"]], "+")  
             metric.val[lambda_start_ind:lambda_end_ind] <- computeMetric(pred.val, response[["val"]], 
                 configs[["metric"]])
