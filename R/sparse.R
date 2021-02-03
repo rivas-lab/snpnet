@@ -101,7 +101,6 @@ sparse_snpnet <- function(genotype.pfile, phenotype.file, phenotype, group_map, 
 
     if(!is.null(variant_filter)) {
         vfilter = data.table::fread(variant_filter, select="ID")
-        browser()
         snps_to_use <- snps_to_use %>% dplyr::filter(original_ID %in% vfilter$ID)
     }
     
@@ -158,7 +157,6 @@ sparse_snpnet <- function(genotype.pfile, phenotype.file, phenotype, group_map, 
     
     gene_cumu <- snps_to_use %>% dplyr::count(gene_order)
     gene_cumu <- c(0, cumsum(gene_cumu$n))
-    
     snpnetLoggerTimeDiff("Preprocessing end.", time.start, indent = 1)
     
     
