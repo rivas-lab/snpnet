@@ -237,7 +237,7 @@ sparse_snpnet <- function(genotype.pfile, phenotype.file, phenotype, group_map, 
         lambda_start_ind <- lambda_schedule[i] + 1
         lambda_end_ind <- lambda_schedule[i + 1]
         lambda_this_iter <- full.lams[lambda_start_ind:lambda_end_ind]
-        result <- pgenlibr::FitGroupLasso(Xtrain, proxObj, responseObj, lambda_this_iter)
+        result <- pgenlibr::FitProx(Xtrain, proxObj, responseObj, lambda_this_iter)
         if(family == "gaussian") {
             result = result * gaussian_response_sd
         }
