@@ -1,6 +1,6 @@
 #' @export
 sparse_snpnet <- function(genotype.pfile, phenotype.file, phenotype, group_map, family = NULL, 
-    covariates = NULL, nlambda = 100, lambda.min.ratio = 0.01, lambda = NULL, split.col = NULL, 
+    covariates = NULL, nlambda = 100, lambda.min.ratio = 1e-4, lambda = NULL, split.col = NULL, 
     p.factor = NULL, status.col = NULL, mem = NULL, configs = NULL, variant_filter=NULL) {
     time.start <- Sys.time()
     snpnetLogger("Start snpnet", log.time = time.start)
@@ -95,24 +95,26 @@ sparse_snpnet <- function(genotype.pfile, phenotype.file, phenotype, group_map, 
     
     snps_to_use <- snps_to_use %>% dplyr::filter((NON_REF_CT >= 3) & (stats_pNAs < 
         configs[["missing.rate"]]) & (miss_over_non_ref < 10))
-    snps_to_use <- snps_to_use %>% dplyr::select(c("#CHROM", "POS", "original_ID", 
-        "index", "NON_REF_CT", "stats_means")) %>% tidyr::separate(original_ID, into = c("CHROM", 
-        "POS"), sep = ":", remove = FALSE, convert = TRUE, extra = "drop")
 
     if(!is.null(variant_filter)) {
         vfilter = data.table::fread(variant_filter, select="ID")
         snps_to_use <- snps_to_use %>% dplyr::filter(original_ID %in% vfilter$ID)
     }
+
+    snps_to_use <- snps_to_use %>% dplyr::select(c("#CHROM", "POS", "index", "NON_REF_CT", "stats_means", "original_ID"))
+    names(snps_to_use)[1] <- "CHROM"
+    snps_to_use$CHROM[snps_to_use$CHROM == "X"] <- "23"
+    snps_to_use$CHROM[snps_to_use$CHROM == "Y"] <- "24"
+    snps_to_use <- snps_to_use[, CHROM:=as.integer(CHROM)]
+
     
-    ### Temporary solution, the mapping file must have these columns
-    gene_map <- data.table::fread(group_map, select = c("#CHROM", "POS", "SYMBOL", 
-        "Csq"))
+    ### The mapping file must have these columns
+    gene_map <- data.table::fread(group_map, select = c("#CHROM", "POS", "SYMBOL", "Csq"), colClasses=c(POS="integer"))
     names(gene_map)[1] <- "CHROM"
     names(gene_map)[3] <- "gene_symbol"
     
     gene_map$CHROM[gene_map$CHROM == "X"] <- "23"
     gene_map$CHROM[gene_map$CHROM == "Y"] <- "24"
-    gene_map$POS <- as.integer(gene_map$POS)
     gene_map$CHROM <- as.integer(gene_map$CHROM)
     unique_chrom <- unique(gene_map$CHROM)
     if (max(unique_chrom) != length(unique_chrom)) {
@@ -124,8 +126,7 @@ sparse_snpnet <- function(genotype.pfile, phenotype.file, phenotype, group_map, 
         ind <- which(gene_map$CHROM == i)
         cumu_chrom[i + 1] <- cumu_chrom[i] + length(ind)
         
-        requirement <- all(diff(gene_map$POS[ind]) >= 0) && (ind[1] == cumu_chrom[i] + 
-            1)
+        requirement <- all(diff(gene_map$POS[ind]) >= 0) && (ind[1] == cumu_chrom[i] + 1)
         if (!requirement) {
             stop("The gene mapping must have all SNPs on the same chromosome stored contiguously, and the position of the SNPs within the same chromosome must be non-decreasing")
         }
@@ -134,8 +135,9 @@ sparse_snpnet <- function(genotype.pfile, phenotype.file, phenotype, group_map, 
         gene_map$POS, cumu_chrom)
     
     # Just for testing,
-    print(all(snps_to_use$CHROM == gene_map$CHROM[snps_gene_ind]))
-    print(all(snps_to_use$POS == gene_map$POS[snps_gene_ind]))
+    if(!all(snps_to_use$POS == gene_map$POS[snps_gene_ind])){
+        stop("something is wrong, most likely the group mapping file does not contain all the variant in the pgen file.")
+    }
     snps_to_use$gene <- gene_map$gene_symbol[snps_gene_ind]
     snps_to_use$Csq <- gene_map$Csq[snps_gene_ind]
     
@@ -163,22 +165,17 @@ sparse_snpnet <- function(genotype.pfile, phenotype.file, phenotype, group_map, 
     ### --- Fit a model using only the covariates
     offset <- list()
     if (family == "cox") {
-        predictors = as.matrix(phe[['train']] %>%  dplyr::select(all_of(covs)))
+        predictors = as.matrix(phe[['train']] %>%  dplyr::select(all_of(covariates)))
         glmmod <- myglmnet::myglmnet(predictors, response[['train']], family="cox", standardize=F, lambda=c(0))
+        glmmod$family <- list("cox")
+        glmmod$model <- c("phenotype", covariates)
         offset[['train']] <- as.double(predictors %*% glmmod$beta)
-        #print(computeMetric(as.matrix(offset[['train']]), response[['train']], configs[["metric"]]))
         if(validation) {
-            offset[['val']] <-  as.matrix(phe[['val']] %>%  dplyr::select(all_of(covs))) %*% glmmod$beta
-            #print(computeMetric(as.matrix(offset[['val']]), response[['val']], configs[["metric"]]))
+            offset[['val']] <-  as.matrix(phe[['val']] %>%  dplyr::select(all_of(covariates))) %*% glmmod$beta
         }
     } else {
         glmmod <- stats::glm(stats::as.formula(paste(phenotype, " ~ ", paste(c(1, 
             covariates), collapse = " + "))), data = phe[["train"]], family = family)
-        # for(s in splits){
-        #     metric = computeMetric(as.matrix(stats::predict(glmmod, phe[[s]] %>% dplyr::select(all_of(covs)))), response[[s]], 
-        #     configs[["metric"]])
-        #     print(paste("split", s, "metric", metric))
-        # }
     }
     
     proxObj <- pgenlibr::NewProxObj(nrow(snps_to_use), gene_cumu)
@@ -227,7 +224,7 @@ sparse_snpnet <- function(genotype.pfile, phenotype.file, phenotype, group_map, 
     
     
     if (validation) {
-        lambda_schedule <- round(c(0, 0.02, 0.05*(1:20)) * length(full.lams))
+        lambda_schedule <- round(c(0, 0.05*(1:20)) * length(full.lams))
     } else {
         lambda_schedule <- c(0, length(full.lams))
     }
@@ -280,6 +277,8 @@ sparse_snpnet <- function(genotype.pfile, phenotype.file, phenotype, group_map, 
     }
     
     rownames(beta) <- snps_to_use$original_ID
+    metric.train = metric.train[1:lambda_end_ind]
+    metric.val = metric.val[1:lambda_end_ind]
     
     # start <- Sys.time() #result <- pgenlibr::SparseTest123(Xtrain,
     # response[['train']], gene_cumu, full.lams[1:30]) print(proxObj) result <-
@@ -287,6 +286,6 @@ sparse_snpnet <- function(genotype.pfile, phenotype.file, phenotype, group_map, 
     # print(Sys.time() - start) print(proxObj) result2 <-
     # pgenlibr::FitGroupLasso(Xtrain, proxObj, responseObj,full.lams[17:30])
     # print(Sys.time() - start)
-    return(list(beta=beta, covs_fit=glmmod, snps_used=snps_to_use, metric.train=metric.train, metric.val=metric.val))
+    return(list(beta=beta, covs_fit=glmmod, snps_used=snps_to_use, metric.train=metric.train, metric.val=metric.val, lambda=full.lams[1:lambda_end_ind]))
     
 }
