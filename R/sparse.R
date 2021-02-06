@@ -224,12 +224,13 @@ sparse_snpnet <- function(genotype.pfile, phenotype.file, phenotype, group_map, 
     
     
     if (validation) {
-        lambda_schedule <- round(c(0, 0.05*(1:20)) * length(full.lams))
+        lambda_schedule <- round(c(0, 0.1*(1:10)) * length(full.lams))
     } else {
         lambda_schedule <- c(0, length(full.lams))
     }
     
     beta = NULL
+    early.stop = FALSE
 
     for (i in 1:(length(lambda_schedule) - 1)) {
         time.iter <- Sys.time()
@@ -266,12 +267,16 @@ sparse_snpnet <- function(genotype.pfile, phenotype.file, phenotype, group_map, 
             
             print(metric.train)
             print(metric.val)
-            
-            max.metric.val <- max(metric.val, na.rm = T)
-            if (metric.val[lambda_end_ind] < max.metric.val) {
+
+            if(early.stop) {
                 snpnetLoggerTimeDiff("Early stopping condition reached", time.start, indent = 1)
                 break
             }
+            
+            max.metric.val <- max(metric.val, na.rm = T)
+            # Update early.stop after checking to go one iteration further in the path
+            early.stop = metric.val[lambda_end_ind] < max.metric.val
+
         }
         snpnetLoggerTimeDiff(paste("Iteration", i, "done"), time.iter, indent = 1)
     }
