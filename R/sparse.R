@@ -168,7 +168,7 @@ sparse_snpnet <- function(genotype.pfile, phenotype.file, phenotype, group_map, 
         predictors = as.matrix(phe[['train']] %>%  dplyr::select(all_of(covariates)))
         glmmod <- myglmnet::myglmnet(predictors, response[['train']], family="cox", standardize=F, lambda=c(0))
         glmmod$family <- list("cox")
-        glmmod$model <- c("phenotype", covariates)
+        glmmod$model <- c(phenotype, covariates)
         offset[['train']] <- as.double(predictors %*% glmmod$beta)
         if(validation) {
             offset[['val']] <-  as.matrix(phe[['val']] %>%  dplyr::select(all_of(covariates))) %*% glmmod$beta
@@ -280,12 +280,6 @@ sparse_snpnet <- function(genotype.pfile, phenotype.file, phenotype, group_map, 
     metric.train = metric.train[1:lambda_end_ind]
     metric.val = metric.val[1:lambda_end_ind]
     
-    # start <- Sys.time() #result <- pgenlibr::SparseTest123(Xtrain,
-    # response[['train']], gene_cumu, full.lams[1:30]) print(proxObj) result <-
-    # pgenlibr::FitGroupLasso(Xtrain, proxObj, responseObj,full.lams[1:16])
-    # print(Sys.time() - start) print(proxObj) result2 <-
-    # pgenlibr::FitGroupLasso(Xtrain, proxObj, responseObj,full.lams[17:30])
-    # print(Sys.time() - start)
     return(list(beta=beta, covs_fit=glmmod, snps_used=snps_to_use, metric.train=metric.train, metric.val=metric.val, lambda=full.lams[1:lambda_end_ind]))
     
 }
