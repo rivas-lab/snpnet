@@ -81,7 +81,8 @@ sparse_predict <- function(fit_obj, genotype.pfile, phenotype.file, split.col = 
     psamid <- readIDsFromPsam(paste0(genotype.pfile, ".psam"))
     phe <- readPheMaster(phenotype.file, psamid, family, covs, phenotype, status, 
         split.col, list(zstdcat.path='zstdcat', zcat.path='zcat'))
-    phe <- phe[phe[[split.col]] == split, ]
+    set_ind <- phe[[split.col]] == split
+    phe <- phe[set_ind, ]
     if (family != "cox") {
         covs_pred <- as.matrix(stats::predict(fit_obj$covs_fit, (phe %>% dplyr::select(all_of(covs)))))
         response <- phe[[phenotype]]

@@ -224,7 +224,7 @@ sparse_snpnet <- function(genotype.pfile, phenotype.file, phenotype, group_map, 
     
     
     if (validation) {
-        lambda_schedule <- round(c(0, 0.1*(1:10)) * length(full.lams))
+        lambda_schedule <- round(c(0, 0.05*(1:20)) * length(full.lams))
     } else {
         lambda_schedule <- c(0, length(full.lams))
     }
