@@ -637,9 +637,6 @@ cleanUpIntermediateFiles <- function(configs){
     }
 }
 
-computeCoxgrad <- function(glmfits, time, d){
-    apply(glmfits, 2, function(f){coxgrad(f,time,d,w=rep(1,length(f)))})
-}
 
 simplifyList_Col <- function(x) {
   sample <- x[[1L]]

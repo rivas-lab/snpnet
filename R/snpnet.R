@@ -203,7 +203,6 @@ snpnet <- function(genotype.pfile, phenotype.file, phenotype, family = NULL, cov
     snpnetLogger("Iteration 0")
     if (family == "cox"){
         glmmod <- myglmnet::myglmnet(as.matrix(features[['train']]), response[['train']], family="cox", standardize=F, lambda=c(0))
-        #residual <- computeCoxgrad(stats::predict(glmmod, newx=as.matrix(features[['train']])), response[['train']][,1], status[['train']])
         residual <- glmmod$residuals
     } else {
         glmmod <- stats::glm(
@@ -367,7 +366,6 @@ snpnet <- function(genotype.pfile, phenotype.file, phenotype, family = NULL, cov
     
     residual <- glmfit$residuals
     pred.train <- myglmnet::PlinkPredict(glmfit, plinkfeature[['train']])
-    print(glmfit$npasses)
 
 
     glmnet.results[[iter]] <- glmfit
