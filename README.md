@@ -8,12 +8,13 @@ License: GPL-2
 
 
 ### Installation:
-Most of the requirements of snpnet are available from CRAN. It also depends on the `pgenlibr` (currently it must use the one from this [branch](https://github.com/RuilinLi/plink-ng/tree/master/2.0/pgenlibr)), `myglmnet` and `cindex` (for survival analysis) packages. One can install them by running the following commands in R. Notice that the installation of `pgenlibr` requires [zstd(>=1.4.4)](https://github.com/facebook/zstd). It can be built from source or simply available from [conda](https://anaconda.org/conda-forge/zstd), [pip](https://pypi.org/project/zstd/) or [brew](https://formulae.brew.sh/formula/zstd).
-
+To use this package you will need to install the following softwares and packages:
+- [zstd(>=1.4.4)](https://github.com/facebook/zstd). Make sure the zstd binaries path is in the environment variable PATH, which should be automatically done if you install using [conda](https://anaconda.org/conda-forge/zstd), [pip](https://pypi.org/project/zstd/) or [brew](https://formulae.brew.sh/formula/zstd).
+- [PLINK 2.0](https://www.cog-genomics.org/plink/2.0/). Make sure the plink2 binary path is in the environment variable PATH.
+- Most of the R dependencies can be downloaded from CRAN. Some dependencies are not available on CRAN. These R packages can be installed with:
 ```r
 library(devtools)
 install_url("https://github.com/RuilinLi/myglmnet/archive/main.zip")
 install_github("chrchang/plink-ng", subdir="/2.0/cindex")
 install_github("RuilinLi/plink-ng", subdir="/2.0/pgenlibr")
 ```
-We assume the users already have PLINK 2.0. Otherwise it can be installed from https://www.cog-genomics.org/plink/2.0/.
