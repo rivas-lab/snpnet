@@ -18,3 +18,7 @@ install_url("https://github.com/RuilinLi/myglmnet/archive/main.zip")
 install_github("chrchang/plink-ng", subdir="/2.0/cindex")
 install_github("RuilinLi/plink-ng", subdir="/2.0/pgenlibr")
 ```
+Finally, to install this package, run
+```r
+devtools::install_github("rivas-lab/snpnet", ref="compact")
+```
