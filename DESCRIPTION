@@ -20,5 +20,6 @@ RoxygenNote: 7.1.1
 Suggests: knitr,
     rmarkdown,
     glmnetPlus,
-    survival
+    survival,
+    selectiveInference
 VignetteBuilder: knitr

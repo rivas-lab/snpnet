@@ -98,7 +98,7 @@
 snpnet <- function(genotype.pfile, phenotype.file, phenotype, family = NULL, covariates = NULL,
                    alpha = 1, nlambda = 100, lambda.min.ratio = ifelse(nobs < nvars, 0.01, 1e-04),
                    lambda = NULL, split.col = NULL, p.factor = NULL, status.col = NULL, mem = NULL,
-                   configs = NULL) {
+                   configs = NULL, sel.inf=FALSE) {
   time.start <- Sys.time()
   snpnetLogger('Start snpnet', log.time = time.start)
 
@@ -481,5 +481,49 @@ snpnet <- function(genotype.pfile, phenotype.file, phenotype, family = NULL, cov
   out <- list(metric.train = metric.train, metric.val = metric.val, glmnet.results = glmnet.results,
               full.lams = full.lams, a0 = a0, beta = beta, configs = configs, var.rank=var.rank,
               stats = stats)
+
+  if(sel.inf){
+    sel.inf.start = Sys.time()
+    snpnetLogger(paste0("Refitting on the sets: ", paste(c("train", "val", "test"), collapse=', ')))
+    phe.refit = phe[['master']]
+    snpnetLogger(paste0("Number of samples in for refitting is ", nrow(phe.refit)))
+    refit.response = phe.refit[[phenotype]]
+    if(family == "cox"){
+      refit.response = survival::Surv(refit.response, phe.refit[[status.col]])
+    }
+    best_ind = which.max(metric.val)
+    train_beta = beta[[best_ind]]
+    train_beta = train_beta[which(train_beta != 0)]
+    snp_to_use = setdiff(names(train_beta), covariates)
+    pgen.refit = pgenlibr::NewPgen(paste0(genotype.pfile, '.pgen'), sample_subset=match(phe.refit$ID, ids[['psam']]))
+    snp_predictors = pgenlibr::ReadList(pgen.refit, match(snp_to_use, vars), meanimpute=T)
+    colnames(snp_predictors) = snp_to_use
+    feature_weights = c(rep(0, length(covariates)), rep(full.lams[best_ind] *nrow(phe.refit),length(snp_to_use)))
+    predictors = phe.refit[, covariates, with=F]
+    predictors = cbind(predictors, snp_predictors)
+    predictors = as.matrix(predictors)
+
+    if(family == "cox"){
+      refit = survival::coxph(refit.response ~ predictors)
+      hessian = cox_fisher(predictors %*% coef(refit), predictors, refit.response[,1], refit.response[,2])
+    } else {
+      stop("Coming soon")
+    }
+    browser()
+
+    mle = approximate_mle_inference(
+    nrow(phe[['train']])/nrow(phe.refit),
+    train_beta,
+    coef(refit),
+    sign(train_beta),
+    hessian,
+    feature_weights,
+    level=0.95)$summary
+
+    snpnetLoggerTimeDiff(paste0("End refitting and Hessian computation ", iter, '.'), sel.inf.start, Sys.time(), indent=1)
+
+
+
+  }
   out
 }
