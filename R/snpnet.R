@@ -509,7 +509,6 @@ snpnet <- function(genotype.pfile, phenotype.file, phenotype, family = NULL, cov
     } else {
       stop("Coming soon")
     }
-    browser()
 
     mle = approximate_mle_inference(
     nrow(phe[['train']])/nrow(phe.refit),
@@ -520,10 +519,9 @@ snpnet <- function(genotype.pfile, phenotype.file, phenotype, family = NULL, cov
     feature_weights,
     level=0.95)$summary
 
-    snpnetLoggerTimeDiff(paste0("End refitting and Hessian computation ", iter, '.'), sel.inf.start, Sys.time(), indent=1)
+    snpnetLoggerTimeDiff(paste0("End refitting and MLE computation ", iter, '.'), sel.inf.start, Sys.time(), indent=1)
 
-
-
+    out[['MLE']] = mle
   }
   out
 }
