@@ -503,22 +503,39 @@ snpnet <- function(genotype.pfile, phenotype.file, phenotype, family = NULL, cov
     predictors = cbind(predictors, snp_predictors)
     predictors = as.matrix(predictors)
 
+    snpnetLogger("Start refitting and Hessian computation")
+    ref.start = Sys.time()
     if(family == "cox"){
-      refit = survival::coxph(refit.response ~ predictors)
-      hessian = cox_fisher(predictors %*% coef(refit), predictors, refit.response[,1], refit.response[,2])
+      #refit = survival::coxph(refit.response ~ predictors)
+      refit = myglmnet::myglmnet(predictors, refit.response, family="cox", standardize=F, lambda=c(0), beta0=train_beta)
+      refit_coefficients = as.matrix(refit$beta)[,1]
+      hessian = cox_fisher(predictors %*% refit_coefficients, predictors, refit.response[,1], refit.response[,2])
     } else {
-      stop("Coming soon")
+      # Need intercept here
+      predictors = cbind(1, predictors)
+      refit = stats::glm.fit(predictors, refit.response, family=match.fun(family)())
+      if(family == "binomial") {
+        predictors = sweep(predictors, 1, sqrt(refit$fitted.values * (1-refit$fitted.values)), "*")
+      }
+      hessian = crossprod(predictors)
+      refit_coefficients = coef(refit)
+      train_beta = c(a0[[best_ind]], train_beta)
+      feature_weights = c(0, feature_weights)
     }
+    snpnetLoggerTimeDiff("End refitting and Hessian computation ", ref.start, Sys.time(), indent=1)
 
+    snpnetLogger("Start computing approximate MLE and Fisher information")
+    mle.start = Sys.time()
     mle = approximate_mle_inference(
     nrow(phe[['train']])/nrow(phe.refit),
     train_beta,
-    coef(refit),
+    refit_coefficients,
     sign(train_beta),
     hessian,
     feature_weights,
     level=0.95)$summary
 
+    snpnetLoggerTimeDiff(paste0("End MLE computation ", iter, '.'), mle.start, Sys.time(), indent=1)
     snpnetLoggerTimeDiff(paste0("End refitting and MLE computation ", iter, '.'), sel.inf.start, Sys.time(), indent=1)
 
     out[['MLE']] = mle

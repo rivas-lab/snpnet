@@ -11,11 +11,12 @@ approximate_mle_inference = function(training_proportion,
     pi_s = training_proportion
     ratio = (1 - pi_s) / pi_s
 
-    target_cov = solve(selected_hessian)
-    cond_precision = selected_hessian / ratio
-    cond_cov = target_cov * ratio
+    target_cov = chol2inv(chol(selected_hessian))
+    #cond_precision = selected_hessian / ratio
+    #cond_cov = target_cov * ratio
     Signs = diag(selected_signs)                                          
-    cond_cov = Signs %*% cond_cov %*% Signs
+    #cond_cov = Signs %*% cond_cov %*% Signs
+    prec_opt = (Signs %*% selected_hessian %*% Signs)/ratio
 
     logdens_linear = Signs %*% target_cov 
     cond_mean = (selected_beta_refit * selected_signs - logdens_linear %*% (
@@ -32,10 +33,11 @@ approximate_mle_inference = function(training_proportion,
                            target_score_cov, 
                            training_betahat * selected_signs,
                            cond_mean,
-                           cond_cov,
+                           prec_opt,
                            logdens_linear,
                            linear_part,
                            offset,
+                           selected_hessian,
                            level=level)
 
     return(result)
@@ -47,21 +49,22 @@ selective_MLE = function(observed_target,
                          target_score_cov, 
                          feasible_point,
                          cond_mean,
-                         cond_cov,
+                         prec_opt,
                          logdens_linear,
                          linear_part,
                          offset,
+                         prec_target,
                          level=0.9,
                          step=1,
                          max_iter=1000,
                          min_iter=200,
                          tol=1.e-12) {
 
-    prec_target = solve(target_cov)
+    #prec_target = chol2inv(chol(target_cov))
     target_lin = - logdens_linear %*% t(target_score_cov) %*% prec_target
     target_offset = cond_mean - target_lin %*% observed_target
 
-    prec_opt = solve(cond_cov)
+    #prec_opt = chol2inv(chol(cond_cov))
     conjugate_arg = prec_opt %*% cond_mean
 
     solve_result = solve_barrier_affine(conjugate_arg,
@@ -132,7 +135,7 @@ solve_barrier_affine = function(conjugate_arg,
     final_affine = offset + opt_variable # linear_term is -I for LASSO
     diag_barrier = - 1 / (final_affine + scaling)^2 + 1 / final_affine^2
     if(length(opt_variable) > 1) {
-       hess = solve(precision + diag(diag_barrier))
+       hess = chol2inv(chol(precision + diag(diag_barrier)))
     } else {
        hess = 1 / (precision + diag_barrier)
        hess = matrix(hess, 1, 1)
