@@ -509,7 +509,7 @@ snpnet <- function(genotype.pfile, phenotype.file, phenotype, family = NULL, cov
       #refit = survival::coxph(refit.response ~ predictors)
       refit = myglmnet::myglmnet(predictors, refit.response, family="cox", standardize=F, lambda=c(0), beta0=train_beta)
       refit_coefficients = as.matrix(refit$beta)[,1]
-      hessian = cox_fisher(predictors %*% refit_coefficients, predictors, refit.response[,1], refit.response[,2])
+      hessian = cox_fisher(predictors, refit_coefficients, refit.response[,1], refit.response[,2])
     } else {
       # Need intercept here
       predictors = cbind(1, predictors)

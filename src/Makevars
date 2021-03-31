@@ -1,0 +1,10 @@
+UNAME_S := $(shell uname -s)
+ifeq ($(UNAME_S),Darwin)
+PKG_CXXFLAGS=-O3 -Xpreprocessor -fopenmp -march=native
+PKG_LIBS=-lomp
+endif
+
+ifeq ($(UNAME_S),Linux)
+PKG_CXXFLAGS=-O3 $(SHLIB_OPENMP_CXXFLAGS) -march=native
+PKG_LIBS=$(SHLIB_OPENMP_CXXFLAGS)
+endif

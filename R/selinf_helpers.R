@@ -168,13 +168,41 @@ fast_cox_fisher = function(f, x, time, c){
   first - second
 }
 
-# A wrapper of the previous function
-cox_fisher = function(f, x, time, c){
-  o = order(time)
-  f = f[o]
-  x = x[o,]
-  c = c[o]
-  time = time[o]
-  fast_cox_fisher(f, x, time, c)
+# # A wrapper of the previous function
+# cox_fisher = function(f, x, time, c){
+#   o = order(time)
+#   f = f[o]
+#   x = x[o,]
+#   c = c[o]
+#   time = time[o]
+#   print("Reorder done!")
+#   fast_cox_fisher(f, x, time, c)
   
+# }
+
+# Important, status must be binary here
+#' @export
+#' @useDynLib snpnet
+cox_fisher = function(x, beta, y, status){
+  eta = exp(scale(x %*% beta, TRUE, FALSE))
+  if(!is.null(dim(eta))){
+    eta = eta[,1]
+  }
+  # Re-index so that y_1  <= y_2 ...
+  o = order(y)
+  y = y[o]
+  status = status[o]
+  eta = eta[o]
+  r = rank(y, ties.method="min")
+  rm =rank(y, ties.method="max")
+  rskden = rev_cumsum(eta)[r]
+  rev_order = order(o)
+  staratio = status/rskden
+  first = sqrt(cumsum(staratio)[rm] * eta)[rev_order]
+  first = sweep(x, 1, first, FUN="*")
+  first = crossprod(first)
+  # x = sweep(x, 1, eta[rev_order], FUN="*")
+  second = CoxHessianHelper(x, staratio, eta, o, r)
+  second = crossprod(second)
+  first - second
 }
