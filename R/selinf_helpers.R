@@ -182,8 +182,12 @@ fast_cox_fisher = function(f, x, time, c){
 
 # Important, status must be binary here
 #' @export
-#' @useDynLib snpnet
+#' @useDynLib snpnet, .registration = TRUE
+#' @importFrom Rcpp sourceCpp
 cox_fisher = function(x, beta, y, status){
+  snpnetLogger("Start Cox Fisher")
+  t0 = Sys.time()
+
   eta = exp(scale(x %*% beta, TRUE, FALSE))
   if(!is.null(dim(eta))){
     eta = eta[,1]
@@ -199,10 +203,23 @@ cox_fisher = function(x, beta, y, status){
   rev_order = order(o)
   staratio = status/rskden
   first = sqrt(cumsum(staratio)[rm] * eta)[rev_order]
+
+  t1 = Sys.time()
+  snpnetLoggerTimeDiff("Start first sweep", t0, t1, indent=1)
   first = sweep(x, 1, first, FUN="*")
-  first = crossprod(first)
+
+  t2 = Sys.time()
+  snpnetLoggerTimeDiff("Start first crossprod", t1, t2, indent=1)
+
+  first = eigenCrossProd(first)
   # x = sweep(x, 1, eta[rev_order], FUN="*")
+
+  t3 = Sys.time()
+  snpnetLoggerTimeDiff("Start helper ", t2, t3, indent=1) 
   second = CoxHessianHelper(x, staratio, eta, o, r)
-  second = crossprod(second)
+  
+  t4 = Sys.time()
+  snpnetLoggerTimeDiff("Start Second crossprod ", t3, t4, indent=1)
+  second = eigenCrossProd(second)
   first - second
 }

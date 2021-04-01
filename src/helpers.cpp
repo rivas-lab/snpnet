@@ -1,5 +1,7 @@
 #include <Rcpp.h>
+#include <RcppEigen.h>
 using namespace Rcpp;
+// [[Rcpp::depends(RcppEigen)]]
 
 // [[Rcpp::export]]
 NumericMatrix CoxHessianHelper(const NumericMatrix x, const NumericVector multiplier, const NumericVector eta, const IntegerVector order_b1, const IntegerVector rankmin_b1)
@@ -41,4 +43,15 @@ NumericMatrix CoxHessianHelper(const NumericMatrix x, const NumericVector multip
         }
     }
     return result;
+}
+
+//' @export
+// [[Rcpp::export]]
+SEXP eigenCrossProd(const Eigen::Map<Eigen::MatrixXd> A)
+{
+    // Return A^T A 
+    Eigen::MatrixXd result = Eigen::MatrixXd::Zero(A.cols(), A.cols());
+    result.selfadjointView<Eigen::Lower>().rankUpdate(A.transpose());
+    result.triangularView<Eigen::Upper>() = result.transpose();
+    return Rcpp::wrap(result);
 }

@@ -5,3 +5,8 @@ CoxHessianHelper <- function(x, multiplier, eta, order_b1, rankmin_b1) {
     .Call('_snpnet_CoxHessianHelper', PACKAGE = 'snpnet', x, multiplier, eta, order_b1, rankmin_b1)
 }
 
+#' @export
+eigenCrossProd <- function(A) {
+    .Call('_snpnet_eigenCrossProd', PACKAGE = 'snpnet', A)
+}
+
