@@ -1,5 +1,5 @@
 #' @export
-sparse_snpnet <- function(genotype.pfile, phenotype.file, phenotype, group_map, family = NULL, 
+sparse_snpnet <- function(genotype.pfile, phenotype.file, phenotype, group_map, group_reg=TRUE, family = NULL, 
     covariates = NULL, nlambda = 100, lambda.min.ratio = 1e-4, lambda = NULL, split.col = NULL, 
     p.factor = NULL, status.col = NULL, mem = NULL, configs = NULL, variant_filter=NULL) {
     time.start <- Sys.time()
@@ -178,7 +178,11 @@ sparse_snpnet <- function(genotype.pfile, phenotype.file, phenotype, group_map, 
             covariates), collapse = " + "))), data = phe[["train"]], family = family)
     }
     
-    proxObj <- pgenlibr::NewProxObj(nrow(snps_to_use), gene_cumu)
+    if(group_reg){
+        proxObj <- pgenlibr::NewProxObj(nrow(snps_to_use), gene_cumu)
+    } else {
+        proxObj <- pgenlibr::NewLassoObj(nrow(snps_to_use))
+    }
     
     
     gaussian_response_sd <- NULL
@@ -211,7 +215,11 @@ sparse_snpnet <- function(genotype.pfile, phenotype.file, phenotype, group_map, 
     snpnetLoggerTimeDiff("End loading genotype matrix", time.load.matrix, indent = 1)
     
     if (is.null(lambda)) {
-        lambda.max <- pgenlibr::ComputeLambdaMax(Xtrain, responseObj, gene_cumu)
+        if(group_reg){
+            lambda.max <- pgenlibr::ComputeLambdaMax(Xtrain, responseObj, gene_cumu)
+        } else {
+            lambda.max <- pgenlibr::ComputeLambdaMax(Xtrain, responseObj, seq(0, nrow(snps_to_use)))
+        }
         full.lams <- exp(seq(from = log(lambda.max), to = log(lambda.max * lambda.min.ratio), 
             length.out = nlambda))
     } else {
