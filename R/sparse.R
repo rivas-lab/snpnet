@@ -1,7 +1,7 @@
 #' @export
-sparse_snpnet <- function(genotype.pfile, phenotype.file, phenotype, group_map, group_reg=TRUE, family = NULL, 
+snpnet2Base <- function(genotype.pfile, phenotype.file, phenotype, VariantFilter=identity, GroupMap=NULL, family = NULL, 
     covariates = NULL, nlambda = 100, lambda.min.ratio = 1e-4, lambda = NULL, split.col = NULL, 
-    p.factor = NULL, status.col = NULL, mem = NULL, configs = NULL, variant_filter=NULL) {
+    p.factor = NULL, status.col = NULL, mem = NULL, configs = NULL) {
     time.start <- Sys.time()
     snpnetLogger("Start snpnet", log.time = time.start)
     
@@ -92,73 +92,17 @@ sparse_snpnet <- function(genotype.pfile, phenotype.file, phenotype, group_map, 
     pgenlibr::ClosePvar(pvar)
     
     snps_to_use <- computeSparseStats(genotype.pfile, phe[["train"]]$ID, configs = configs)
-    
-    snps_to_use <- snps_to_use %>% dplyr::filter((NON_REF_CT >= 3) & (stats_pNAs < 
-        configs[["missing.rate"]]) & (miss_over_non_ref < 10))
 
-    if(!is.null(variant_filter)) {
-        vfilter = data.table::fread(variant_filter, select="ID")
-        snps_to_use <- snps_to_use %>% dplyr::filter(original_ID %in% vfilter$ID)
-    }
 
     snps_to_use <- snps_to_use %>% dplyr::select(c("#CHROM", "POS", "index", "NON_REF_CT", "stats_means", "original_ID"))
     names(snps_to_use)[1] <- "CHROM"
     snps_to_use$CHROM[snps_to_use$CHROM == "X"] <- "23"
     snps_to_use$CHROM[snps_to_use$CHROM == "Y"] <- "24"
     snps_to_use <- snps_to_use[, CHROM:=as.integer(CHROM)]
-
-    
-    ### The mapping file must have these columns
-    gene_map <- data.table::fread(group_map, select = c("#CHROM", "POS", "SYMBOL", "Csq"), colClasses=c(POS="integer"))
-    names(gene_map)[1] <- "CHROM"
-    names(gene_map)[3] <- "gene_symbol"
-    
-    gene_map$CHROM[gene_map$CHROM == "X"] <- "23"
-    gene_map$CHROM[gene_map$CHROM == "Y"] <- "24"
-    gene_map$CHROM <- as.integer(gene_map$CHROM)
-    unique_chrom <- unique(gene_map$CHROM)
-    if (max(unique_chrom) != length(unique_chrom)) {
-        stop("The chromosome must be stored in the order 1,2,3,..., X, Y")
+    snps_to_use <- VariantFilter(snps_to_use)
+    if(!is.null(GroupMap)){
+        gene_cumu <- GroupMap(snps_to_use)
     }
-    
-    cumu_chrom <- integer(length(unique_chrom) + 1)
-    for (i in (1:length(unique_chrom))) {
-        ind <- which(gene_map$CHROM == i)
-        cumu_chrom[i + 1] <- cumu_chrom[i] + length(ind)
-        
-        requirement <- all(diff(gene_map$POS[ind]) >= 0) && (ind[1] == cumu_chrom[i] + 1)
-        if (!requirement) {
-            stop("The gene mapping must have all SNPs on the same chromosome stored contiguously, and the position of the SNPs within the same chromosome must be non-decreasing")
-        }
-    }
-    snps_gene_ind <- pgenlibr::match_sorted_snp(snps_to_use$CHROM, snps_to_use$POS, 
-        gene_map$POS, cumu_chrom)
-    
-    # Just for testing,
-    if(!all(snps_to_use$POS == gene_map$POS[snps_gene_ind])){
-        stop("something is wrong, most likely the group mapping file does not contain all the variant in the pgen file.")
-    }
-    snps_to_use$gene <- gene_map$gene_symbol[snps_gene_ind]
-    snps_to_use$Csq <- gene_map$Csq[snps_gene_ind]
-    
-    # Only use autosome
-    snps_to_use <- snps_to_use %>% dplyr::filter(CHROM < 23) %>% dplyr::filter(gene != 
-        "" & (Csq %in% c("ptv", "pav")))
-    # snps_to_use = snps_to_use %>% filter(Csq %in% c('ptv', 'pav'))
-    
-    genes_with_comma <- grepl(",", snps_to_use$gene, fixed = TRUE)
-    if (any(genes_with_comma)) {
-        warning("Some SNPs are mapped to multiple genes. The first gene symbols will be used to group these SNPs")
-        snps_to_use$gene[genes_with_comma] <- sapply(strsplit(snps_to_use$gene[genes_with_comma], 
-            ","), "[", 1)
-    }
-    
-    unique_genes <- unique(snps_to_use$gene)
-    snps_to_use$gene_order <- match(snps_to_use$gene, unique_genes)
-    snps_to_use <- snps_to_use %>% dplyr::arrange(gene_order)
-    
-    gene_cumu <- snps_to_use %>% dplyr::count(gene_order)
-    gene_cumu <- c(0, cumsum(gene_cumu$n))
     snpnetLoggerTimeDiff("Preprocessing end.", time.start, indent = 1)
     
     
@@ -178,6 +122,7 @@ sparse_snpnet <- function(genotype.pfile, phenotype.file, phenotype, group_map, 
             covariates), collapse = " + "))), data = phe[["train"]], family = family)
     }
     
+    group_reg = !is.null(GroupMap)
     if(group_reg){
         proxObj <- pgenlibr::NewProxObj(nrow(snps_to_use), gene_cumu)
     } else {
@@ -295,4 +240,85 @@ sparse_snpnet <- function(genotype.pfile, phenotype.file, phenotype, group_map, 
     
     return(list(beta=beta, covs_fit=glmmod, snps_used=snps_to_use, metric.train=metric.train, metric.val=metric.val, lambda=full.lams[1:lambda_end_ind]))
     
+}
+
+
+#' @export
+sparse_snpnet <- function(genotype.pfile, phenotype.file, phenotype, group_map, family = NULL, 
+    covariates = NULL, nlambda = 100, lambda.min.ratio = 1e-4, lambda = NULL, split.col = NULL, 
+    p.factor = NULL, status.col = NULL, mem = NULL, configs = NULL, variant_filter=NULL) {
+
+        ### The mapping file must have these columns
+    gene_map <- data.table::fread(group_map, select = c("#CHROM", "POS", "SYMBOL", "Csq"), colClasses=c(POS="integer"))
+    names(gene_map)[1] <- "CHROM"
+    names(gene_map)[3] <- "gene_symbol"
+    
+    gene_map$CHROM[gene_map$CHROM == "X"] <- "23"
+    gene_map$CHROM[gene_map$CHROM == "Y"] <- "24"
+    gene_map$CHROM <- as.integer(gene_map$CHROM)
+    unique_chrom <- unique(gene_map$CHROM)
+    if (max(unique_chrom) != length(unique_chrom)) {
+        stop("The chromosome must be stored in the order 1,2,3,..., X, Y")
+    }
+    
+    cumu_chrom <- integer(length(unique_chrom) + 1)
+    for (i in (1:length(unique_chrom))) {
+        ind <- which(gene_map$CHROM == i)
+        cumu_chrom[i + 1] <- cumu_chrom[i] + length(ind)
+        
+        requirement <- all(diff(gene_map$POS[ind]) >= 0) && (ind[1] == cumu_chrom[i] + 1)
+        if (!requirement) {
+            stop("The gene mapping must have all SNPs on the same chromosome stored contiguously, and the position of the SNPs within the same chromosome must be non-decreasing")
+        }
+    }
+
+
+    VariantFilter = function(snps_to_use){
+        snps_to_use <- snps_to_use %>% dplyr::filter((NON_REF_CT >= 3) & (stats_pNAs < 
+        configs[["missing.rate"]]) & (miss_over_non_ref < 10))
+
+        if(!is.null(variant_filter)) {
+            vfilter = data.table::fread(variant_filter, select="ID")
+            snps_to_use <- snps_to_use %>% dplyr::filter(original_ID %in% vfilter$ID)
+        }
+
+        snps_gene_ind <- pgenlibr::match_sorted_snp(snps_to_use$CHROM, snps_to_use$POS, 
+        gene_map$POS, cumu_chrom)
+    
+        # Just for testing,
+        if(!all(snps_to_use$POS == gene_map$POS[snps_gene_ind])){
+            stop("something is wrong, most likely the group mapping file does not contain all the variant in the pgen file.")
+        }
+        snps_to_use$gene <- gene_map$gene_symbol[snps_gene_ind]
+        snps_to_use$Csq <- gene_map$Csq[snps_gene_ind]
+        
+        # Only use autosome
+        snps_to_use <- snps_to_use %>% dplyr::filter(CHROM < 23) %>% dplyr::filter(gene != 
+            "" & (Csq %in% c("ptv", "pav")))
+        # snps_to_use = snps_to_use %>% filter(Csq %in% c('ptv', 'pav'))
+        
+        genes_with_comma <- grepl(",", snps_to_use$gene, fixed = TRUE)
+        if (any(genes_with_comma)) {
+            warning("Some SNPs are mapped to multiple genes. The first gene symbols will be used to group these SNPs")
+            snps_to_use$gene[genes_with_comma] <- sapply(strsplit(snps_to_use$gene[genes_with_comma], 
+                ","), "[", 1)
+        }
+        
+        unique_genes <- unique(snps_to_use$gene)
+        snps_to_use$gene_order <- match(snps_to_use$gene, unique_genes)
+        snps_to_use <- snps_to_use %>% dplyr::arrange(gene_order)
+        return(snps_to_use)
+    }
+
+    GroupMap = function(snps_to_use){
+        gene_cumu <- snps_to_use %>% dplyr::count(gene_order)
+        gene_cumu <- c(0, cumsum(gene_cumu$n))
+        return(gene_cumu)
+    }
+
+
+    snpnet2Base(genotype.pfile, phenotype.file, phenotype, VariantFilter, GroupMap, family, 
+    covariates, nlambda, lambda.min.ratio, lambda, split.col, 
+    p.factor, status.col, mem, configs)
+
 }
