@@ -94,11 +94,6 @@ snpnet2Base <- function(genotype.pfile, phenotype.file, phenotype, VariantFilter
     snps_to_use <- computeSparseStats(genotype.pfile, phe[["train"]]$ID, configs = configs)
 
 
-    snps_to_use <- snps_to_use %>% dplyr::select(c("#CHROM", "POS", "index", "NON_REF_CT", "stats_means", "original_ID"))
-    names(snps_to_use)[1] <- "CHROM"
-    snps_to_use$CHROM[snps_to_use$CHROM == "X"] <- "23"
-    snps_to_use$CHROM[snps_to_use$CHROM == "Y"] <- "24"
-    snps_to_use <- snps_to_use[, CHROM:=as.integer(CHROM)]
     snps_to_use <- VariantFilter(snps_to_use)
     if(!is.null(GroupMap)){
         gene_cumu <- GroupMap(snps_to_use)
@@ -273,45 +268,50 @@ sparse_snpnet <- function(genotype.pfile, phenotype.file, phenotype, group_map, 
     }
 
 
-    VariantFilter = function(snps_to_use){
-        snps_to_use <- snps_to_use %>% dplyr::filter((NON_REF_CT >= 3) & (stats_pNAs < 
-        configs[["missing.rate"]]) & (miss_over_non_ref < 10))
+    VariantFilter = function(snps_to_use_arg){
+        snps_to_use_arg <- snps_to_use_arg %>% dplyr::filter((NON_REF_CT >= 3) & (stats_pNAs < 0.1) & (miss_over_non_ref < 10))
 
         if(!is.null(variant_filter)) {
             vfilter = data.table::fread(variant_filter, select="ID")
-            snps_to_use <- snps_to_use %>% dplyr::filter(original_ID %in% vfilter$ID)
+            snps_to_use_arg <- snps_to_use_arg %>% dplyr::filter(original_ID %in% vfilter$ID)
         }
 
-        snps_gene_ind <- pgenlibr::match_sorted_snp(snps_to_use$CHROM, snps_to_use$POS, 
+        snps_to_use_arg <- snps_to_use_arg %>% dplyr::select(c("#CHROM", "POS", "index", "NON_REF_CT", "stats_means", "original_ID"))
+        names(snps_to_use_arg)[1] <- "CHROM"
+        snps_to_use_arg$CHROM[snps_to_use_arg$CHROM == "X"] <- "23"
+        snps_to_use_arg$CHROM[snps_to_use_arg$CHROM == "Y"] <- "24"
+        snps_to_use_arg <- snps_to_use_arg[, CHROM:=as.integer(CHROM)]
+
+        snps_gene_ind <- pgenlibr::match_sorted_snp(snps_to_use_arg$CHROM, snps_to_use_arg$POS, 
         gene_map$POS, cumu_chrom)
     
         # Just for testing,
-        if(!all(snps_to_use$POS == gene_map$POS[snps_gene_ind])){
+        if(!all(snps_to_use_arg$POS == gene_map$POS[snps_gene_ind])){
             stop("something is wrong, most likely the group mapping file does not contain all the variant in the pgen file.")
         }
-        snps_to_use$gene <- gene_map$gene_symbol[snps_gene_ind]
-        snps_to_use$Csq <- gene_map$Csq[snps_gene_ind]
+        snps_to_use_arg$gene <- gene_map$gene_symbol[snps_gene_ind]
+        snps_to_use_arg$Csq <- gene_map$Csq[snps_gene_ind]
         
         # Only use autosome
-        snps_to_use <- snps_to_use %>% dplyr::filter(CHROM < 23) %>% dplyr::filter(gene != 
+        snps_to_use_arg <- snps_to_use_arg %>% dplyr::filter(CHROM < 23) %>% dplyr::filter(gene != 
             "" & (Csq %in% c("ptv", "pav")))
         # snps_to_use = snps_to_use %>% filter(Csq %in% c('ptv', 'pav'))
         
-        genes_with_comma <- grepl(",", snps_to_use$gene, fixed = TRUE)
+        genes_with_comma <- grepl(",", snps_to_use_arg$gene, fixed = TRUE)
         if (any(genes_with_comma)) {
             warning("Some SNPs are mapped to multiple genes. The first gene symbols will be used to group these SNPs")
-            snps_to_use$gene[genes_with_comma] <- sapply(strsplit(snps_to_use$gene[genes_with_comma], 
+            snps_to_use_arg$gene[genes_with_comma] <- sapply(strsplit(snps_to_use_arg$gene[genes_with_comma], 
                 ","), "[", 1)
         }
         
-        unique_genes <- unique(snps_to_use$gene)
-        snps_to_use$gene_order <- match(snps_to_use$gene, unique_genes)
-        snps_to_use <- snps_to_use %>% dplyr::arrange(gene_order)
-        return(snps_to_use)
+        unique_genes <- unique(snps_to_use_arg$gene)
+        snps_to_use_arg$gene_order <- match(snps_to_use_arg$gene, unique_genes)
+        snps_to_use_arg <- snps_to_use_arg %>% dplyr::arrange(gene_order)
+        return(snps_to_use_arg)
     }
 
-    GroupMap = function(snps_to_use){
-        gene_cumu <- snps_to_use %>% dplyr::count(gene_order)
+    GroupMap = function(snps_to_use_arg){
+        gene_cumu <- snps_to_use_arg %>% dplyr::count(gene_order)
         gene_cumu <- c(0, cumsum(gene_cumu$n))
         return(gene_cumu)
     }
