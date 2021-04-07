@@ -1,5 +1,12 @@
+defaultVariantFilter = function(snps_to_use_arg){
+   # Default filter removes variants whose has more than 10% NAs in the training set
+   snps_to_use_arg <- snps_to_use_arg %>% dplyr::filter(stats_pNAs < 0.1)
+   return(snps_to_use_arg)
+}
+
+
 #' @export
-snpnet2Base <- function(genotype.pfile, phenotype.file, phenotype, VariantFilter=identity, GroupMap=NULL, family = NULL, 
+snpnet2Base <- function(genotype.pfile, phenotype.file, phenotype, VariantFilter=defaultVariantFilter, GroupMap=NULL, family = NULL, 
     covariates = NULL, nlambda = 100, lambda.min.ratio = 1e-4, lambda = NULL, split.col = NULL, 
     p.factor = NULL, status.col = NULL, mem = NULL, configs = NULL) {
     time.start <- Sys.time()
