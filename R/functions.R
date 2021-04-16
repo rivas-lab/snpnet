@@ -379,6 +379,8 @@ computeStats <- function(pfile, ids, configs) {
   }
   out[["excludeSNP"]] <- names(out[["means"]])[(out[["pnas"]] > configs[["missing.rate"]]) | (out[["means"]] < 2 * configs[["MAF.thresh"]])]
   out[["excludeSNP"]] <- out[["excludeSNP"]][ ! is.na(out[["excludeSNP"]]) ]
+  exclude.CHROM.VAR.ID <- gcount_df$ID[which(gcount_df[['#CHROM']] %in% configs[['excludeCHROM']])]
+  out[["excludeSNP"]] <- base::unique(c(out[["excludeSNP"]], exclude.CHROM.VAR.ID))
 
   if (configs[['save']]){
       gcount_df %>% data.table::fwrite(gcount_tsv_f, sep='\t')
@@ -697,7 +699,8 @@ setupConfigs <- function(configs, genotype.pfile, phenotype.file, phenotype, cov
         plink2.path='plink2',
         zstdcat.path='zstdcat',
         zcat.path='zcat',
-        rank = TRUE
+        rank = TRUE,
+        excludeCHROM=character(0)
     )
     out <- defaults
 
@@ -724,6 +727,8 @@ setupConfigs <- function(configs, genotype.pfile, phenotype.file, phenotype, cov
     if(is.null(out[['gcount.full.prefix']])) out[['gcount.full.prefix']] <- file.path(
         out[['results.dir']], out[["meta.dir"]], out['gcount.basename.prefix']
     )
+
+    out[['excludeCHROM']] = as.character(out[['excludeCHROM']])
 
     out
 }
