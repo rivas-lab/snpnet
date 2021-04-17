@@ -243,8 +243,8 @@ snpnet2Base <- function(genotype.pfile, phenotype.file, phenotype, VariantFilter
             metric.val[lambda_start_ind:lambda_end_ind] <- computeMetric(pred.val, response[["val"]], 
                 configs[["metric"]])
             
-            print(metric.train)
-            print(metric.val)
+            print(metric.train[1:lambda_end_ind])
+            print(metric.val[1:lambda_end_ind])
 
             if(early.stop) {
                 snpnetLoggerTimeDiff("Early stopping condition reached", time.start, indent = 1)
