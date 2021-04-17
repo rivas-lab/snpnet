@@ -104,6 +104,9 @@ snpnet2Base <- function(genotype.pfile, phenotype.file, phenotype, VariantFilter
     snps_to_use <- VariantFilter(snps_to_use)
     if(!is.null(GroupMap)){
         gene_cumu <- GroupMap(snps_to_use)
+        snpnetLogger("Solving a Group Lasso problem.")
+    } else {
+        snpnetLogger("Solving a Lasso problem.")
     }
     snpnetLoggerTimeDiff("Preprocessing end.", time.start, indent = 1)
     snpnetLogger(paste("Number of variants to use is", nrow(snps_to_use), "Training data size is", nrow(phe[['train']])))
