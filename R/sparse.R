@@ -7,7 +7,7 @@ defaultVariantFilter = function(snps_to_use_arg){
 
 #' @export
 snpnet2Base <- function(genotype.pfile, phenotype.file, phenotype, VariantFilter=defaultVariantFilter, GroupMap=NULL, family = NULL, 
-    covariates = NULL, nlambda = 100, lambda.min.ratio = 1e-4, lambda = NULL, split.col = NULL, 
+    covariates = NULL, sparse=TRUE, nlambda = 100, lambda.min.ratio = 1e-4, lambda = NULL, split.col = NULL, 
     p.factor = NULL, status.col = NULL, mem = NULL, configs = NULL) {
     time.start <- Sys.time()
     snpnetLogger("Start snpnet", log.time = time.start)
@@ -106,7 +106,7 @@ snpnet2Base <- function(genotype.pfile, phenotype.file, phenotype, VariantFilter
         gene_cumu <- GroupMap(snps_to_use)
     }
     snpnetLoggerTimeDiff("Preprocessing end.", time.start, indent = 1)
-    
+    snpnetLogger(paste("Number of variants to use is", nrow(snps_to_use), "Training data size is", nrow(phe[['train']])))
     
     ### --- Fit a model using only the covariates
     offset <- list()
@@ -154,8 +154,28 @@ snpnet2Base <- function(genotype.pfile, phenotype.file, phenotype, VariantFilter
     
     time.load.matrix <- Sys.time()
     snpnetLogger("Start loading training genotype matrix")
+    if(sparse){
+        if(nrow(snps_to_use) < 10000 || nrow(phe[['train']]) < 30000){
+            warning("Data size too small. Dense representation will be used")
+            sparse <- FALSE
+        }
+    }
+    if(sparse){
+        Xtrain <- try(pgenlibr::NewSparse(pgen[["train"]], snps_to_use$index))
+        if(is(Xtrain, "try-error")){
+            sparse <- FALSE
+            warning("Loading sparse training matrix failed. This happens most likely because the reference allele is not the major allele, or some variants have large number of NAs. Use Dense instead.")
+        }
+    }
     
-    Xtrain <- pgenlibr::NewSparse(pgen[["train"]], snps_to_use$index)
+    if(sparse){
+        MULT_FUN <- pgenlibr::SparseMultv
+    } else {
+        Xtrain <- pgenlibr::NewDense(pgen[["train"]], snps_to_use$index)
+        MULT_FUN <- pgenlibr::DenseMultv
+    }
+
+    
     if(validation){
         Xval <- pgenlibr::NewDense(pgen[["val"]], snps_to_use$index, snps_to_use$stats_means)
     }
@@ -202,7 +222,7 @@ snpnet2Base <- function(genotype.pfile, phenotype.file, phenotype, VariantFilter
         ### Compute training metric
         pred.train = matrix(nrow=length(response[["train"]]), ncol=ncol(result))
         for (j in 1:(ncol(result))) {
-            pred.train[, j] <- pgenlibr::SparseMultv(Xtrain, result[, j])
+            pred.train[, j] <- MULT_FUN(Xtrain, result[, j])
         }
 
         pred.train <- sweep(pred.train, 1,  offset[["train"]], "+")  
@@ -247,7 +267,7 @@ snpnet2Base <- function(genotype.pfile, phenotype.file, phenotype, VariantFilter
 
 #' @export
 sparse_snpnet <- function(genotype.pfile, phenotype.file, phenotype, group_map, family = NULL, 
-    covariates = NULL, nlambda = 100, lambda.min.ratio = 1e-4, lambda = NULL, split.col = NULL, 
+    covariates = NULL, sparse=TRUE, nlambda = 100, lambda.min.ratio = 1e-4, lambda = NULL, split.col = NULL, 
     p.factor = NULL, status.col = NULL, mem = NULL, configs = NULL, variant_filter=NULL) {
 
         ### The mapping file must have these columns
@@ -325,7 +345,7 @@ sparse_snpnet <- function(genotype.pfile, phenotype.file, phenotype, group_map, 
 
 
     snpnet2Base(genotype.pfile, phenotype.file, phenotype, VariantFilter, GroupMap, family, 
-    covariates, nlambda, lambda.min.ratio, lambda, split.col, 
+    covariates, sparse, nlambda, lambda.min.ratio, lambda, split.col, 
     p.factor, status.col, mem, configs)
 
 }
