@@ -43,7 +43,7 @@ Here are the input arguments of `snpnet2Base`
 - `genotype.pfile`, the prefix of PLINK2's pgen format of the genetic variants used for prediction. In particular, these three files should exist `genotype.pfile.{pgen,pvar.zst,psam}`. If you would like to utilize sparsity in this matrix, make sure that the reference allele in this file is the major allele. This can be done using Plink2 with the flag `--maj-ref`.
 - `phenotype.file` the path of the file that contains the phenotype values and can be read as a table. There should be FID (family ID) and IID (individual ID) columns containing the identifier for each individual, and the phenotype column(s). (optional) some covariate columns and a column specifying the training/validation split can be included in this file.
 - `phenotype` the column name of the phenotype in `phenotype.file`
-- `VariantFilter`, a function that filters genetic variants based on a table of the following format (this table is generated within `snpnet2Base`)
+- `VariantFilter`  (optional), a function that filters genetic variants based on a table of the following format (this table is generated within `snpnet2Base`)
 
 |#CHROM |   POS|original_ID |REF |ALT | HOM_REF_CT| HET_REF_ALT_CTS| TWO_ALT_GENO_CTS| HAP_REF_CT| HAP_ALT_CTS| MISSING_CT| OBS_CT|ID            | stats_pNAs| NON_REF_CT| miss_over_non_ref| stats_means| index|
 |:------|-----:|:-----------|:---|:---|----------:|---------------:|----------------:|----------:|-----------:|----------:|------:|:-------------|----------:|----------:|-----------------:|-----------:|-----:|
@@ -54,8 +54,8 @@ Here are the input arguments of `snpnet2Base`
 |1      | 69224|1:69224:A:T |A   |T   |      96443|              17|                0|          0|           0|        123|  96460|1:69224:A:T_T |  0.0012735|         17|          7.235294|   0.0001762|     5|
 |1      | 69231|1:69231:C:T |C   |T   |      96344|               1|                0|          0|           0|        238|  96345|1:69231:C:T_T |  0.0024642|          1|        238.000000|   0.0000104|     6|
 
-`VariantFilter` (optional) should modify this data table and return the modified table. We encourage the users to look at the [default Variant filter](https://github.com/rivas-lab/snpnet/blob/a7c95cceded3bfb0881f77d92fd6a24ac17f7171/R/sparse.R#L1) and a [more advanced one](https://github.com/rivas-lab/snpnet/blob/a7c95cceded3bfb0881f77d92fd6a24ac17f7171/R/sparse.R#L301) that uses external data. The allowed operations are:
-  1. Removing rows from it (based on the column values). This corresponds to exluding a genetic variant from the analysis.
+`VariantFilter` should modify this data table and return the modified table. We encourage the users to look at the [default Variant filter](https://github.com/rivas-lab/snpnet/blob/a7c95cceded3bfb0881f77d92fd6a24ac17f7171/R/sparse.R#L1) and a [more advanced one](https://github.com/rivas-lab/snpnet/blob/a7c95cceded3bfb0881f77d92fd6a24ac17f7171/R/sparse.R#L301) that uses external data. The allowed operations are:
+  1. Removing rows from it (based on the column values). This corresponds to exluding genetic variants from the analysis.
   2. Adding columns to provide additional information (for example the gene symbol. This modified data table will be part of the output of `snpnet2Base`.
   3. Reordering the rows. This is necessary for group Lasso, where the variants in the same group must be in adjacent rows in this data table (see the next bullet point).
 
