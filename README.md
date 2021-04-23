@@ -59,7 +59,7 @@ Here are the input arguments of `snpnet2Base`
   2. Adding columns to provide additional information (for example the gene symbol. This modified data table will be part of the output of `snpnet2Base`.
   3. Reordering the rows. This is necessary for group Lasso, where the variants in the same group must be in adjacent rows in this data table (see the next bullet point).
 
-- `GroupMap` (required only for group Lasso), which is again a function (or NULL if running Lasso) takes the input from `VariantFilter` and returns an strictly increasing integer vector `out` such that. The variants in group `i` occupy the rows `out[i] + 1, ..., out[i+1]` in the output of `VariantFilter`. See [here](https://github.com/rivas-lab/snpnet/blob/a7c95cceded3bfb0881f77d92fd6a24ac17f7171/R/sparse.R#L343) for an example. 
+- `GroupMap` (required only for group Lasso), which is again a function (or NULL if running Lasso) takes the output from `VariantFilter` and returns a strictly increasing integer vector `out` such that. The variants in group `i` occupy the rows `out[i] + 1, ..., out[i+1]` in the output of `VariantFilter`. See [here](https://github.com/rivas-lab/snpnet/blob/a7c95cceded3bfb0881f77d92fd6a24ac17f7171/R/sparse.R#L343) for an example. 
 - `family` (optional), can be one of `'gaussian', 'binomial', 'cox'`.
 - `covariates`, the column names of the covariates in `phenotype.file`.
 - `sparse` (optional), if set TRUE, this function will try to use a sparse representation of the input genetic matrix for the training data.
