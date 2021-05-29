@@ -76,3 +76,6 @@ Here are the input arguments of `snpnet2Base`
 
 #### Select the number of threads
 Both exported function use OpenMP to parallellize their solvers. To change the number of cores to use (say to 16) when fitting run `OMP_NUM_THREADS=16 R` or `OMP_NUM_THREADS=16 Rscript Your_script_name.R` (this will also change the number of threads of other functions that uses OpenMP in the same session). The default will use all core avaliable in the machine. On our machine we observe when the number of threads exceeds 12-16 the performance improvement plateaus, but this could vary depending on the problem size, the processor, and memory system. 
+
+### Selective Inference
+`snpnet` implements post-selection inference method developed in [this paper](https://arxiv.org/pdf/1902.07884.pdf), which provides asymptotically valid confidence intervals of the parameter estimates conditional on the selection event. To use it, set `sel.inf = T` in `snpnet` call. To achieve higher power, the confidence interval and p-values are based on the refitting results from the combined training and validation set.
