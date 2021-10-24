@@ -191,7 +191,7 @@ compute_mean <- function(df, percentile_col, phe_col, l_bin, u_bin){
     # Compute the mean and sd of the trait value (phe_col), based on the
     # binning (l_bin, u_bin] with the percentile of PRS (percentile_col)
     stratified_df <- df %>%
-    rename(Percentile = percentile_col, phe = phe_col) %>%
+    rename(!!'Percentile' := percentile_col, !!'phe' := phe_col) %>%
     filter(l_bin < Percentile, Percentile <= u_bin)
 
     n     <- stratified_df %>% nrow()
@@ -220,7 +220,7 @@ filter_by_percentile_and_count_phe <- function(df, percentile_col, phe_col, l_bi
     # This provides the counts of the descrete phenotype value (phe_col)
     # for the specified bin (l_bin, u_bin], based on the percentile of PRS (percentile_col)
     df %>%
-    rename(Percentile = percentile_col, phe = phe_col) %>%
+    rename(!!'Percentile' := percentile_col, !!'phe' := phe_col) %>%
     filter(l_bin < Percentile, Percentile <= u_bin) %>%
     count(phe)
 }
