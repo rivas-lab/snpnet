@@ -62,7 +62,7 @@ harness for the computation. IMPORTANT if using a job scheduler.}
 
 \item{configs}{a list of other config parameters.
 \describe{
- \item{missing.rate}{variants are excluded if the missing rate exceeds this level. Default is 0.05.}
+ \item{missing.rate}{variants are excluded if the missing rate exceeds this level. Default is 0.1.}
  \item{MAF.thresh}{variants are excluded if the minor allele frequency (MAF) is lower
                 than this level. Default is 0.001.}
  \item{nCores}{the number of cores used for computation. You may use the maximum number
@@ -80,6 +80,8 @@ harness for the computation. IMPORTANT if using a job scheduler.}
  \item{save.dir}{the relative path to the subdirectory used to store the intermediate
               results so that we may look into or recover from later.
               Needed when `save = TRUE`. Default is `"results/`.}
+ \item{excludeSNP}{character vector containing genotype names to exclude from
+                  the analysis}
  \item{nlams.init}{the number of lambdas considered in the first iteration.
               Default 10 is a reasonable number to start with.}
  \item{nlams.delta}{the length of extended lambdas down the sequence when there are few
