@@ -66,6 +66,18 @@ read_lambda_sequence_from_RData_file <- function(rdata_f){
     fit$full.lams[1:which.max(fit$metric.val)]
 }
 
+
+get_ID_ALTs <- function(ID_ALT_file){
+    # read a table (text) file that contains "ID" and "ALT" column
+    # and return as a list containing "ID_ALT"
+    fread(
+        cmd=paste(cat_or_zcat(ID_ALT_file), ID_ALT_file),
+        select=c('ID', 'ALT')
+    ) %>%
+    mutate(ID_ALT = paste0(ID, '_', ALT)) %>% pull(ID_ALT)
+}
+
+
 read_config_from_file <- function(config_file){
     # parse the 2-column config file for snpnet wrapper script
     # and return as a named list.
@@ -120,6 +132,27 @@ read_config_from_file <- function(config_file){
         config[['split.col']] <- NULL
     }else if (! 'lambda' %in% names(config)) {
         config[['lambda']] <- NULL
+    }
+
+    if(
+        # exclude a list of SNPs
+        ('exclude' %in% names(config)) &&
+        (! is.null(config[['exclude']])) &&
+        (! config[['exclude']] %in% null_strs)
+    ){
+        config[['excludeSNP']] <- get_ID_ALTs(config[['exclude']])
+    }else if(
+        # extract a list of SNPs
+        ('extract' %in% names(config)) &&
+        (! is.null(config[['extract']])) &&
+        (! config[['extract']] %in% null_strs)
+    ){
+        config[['excludeSNP']] <- setdiff(
+            get_ID_ALTs(sprintf('%s.pvar.zst', config[['genotype.pfile']])),
+            get_ID_ALTs(config[['extract']])
+        )
+    }else if (! 'excludeSNP' %in% names(config)){
+        config[['excludeSNP']] <- NULL
     }
 
     config

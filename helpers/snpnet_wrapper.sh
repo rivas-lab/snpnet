@@ -3,7 +3,7 @@ set -beEuo pipefail
 
 SRCNAME=$(readlink -f $0)
 PROGNAME=$(basename $SRCNAME)
-VERSION="0.3.18"
+VERSION="1.4.0"
 NUM_POS_ARGS="5"
 
 source "$(dirname ${SRCNAME})/snpnet_misc.sh"
@@ -95,6 +95,8 @@ vzs=T
 rank=F
 p_factor_file="None"
 refit_from_RData="None"
+extract="NULL"
+exclude="NULL"
 ## == Default parameters (end) == ##
 
 declare -a params=()
@@ -157,6 +159,12 @@ for OPT in "$@" ; do
         '--refit_from_RData' )
             refit_from_RData=$2 ; shift 2 ;
             ;;
+        '--extract' )
+            extract=$2 ; shift 2 ;
+            ;;
+        '--exclude' )
+            exclude=$2 ; shift 2 ;
+            ;;
         '--'|'-' )
             shift 1 ; params+=( "$@" ) ; break
             ;;
@@ -215,6 +223,8 @@ cat <<- EOF | tr " " "\t" > ${config_file}
 	vzs ${vzs}
 	p.factor.file ${p_factor_file}
 	refit_from_RData ${refit_from_RData}
+	extract ${extract}
+	exclude ${exclude}
 EOF
 
 echo "===================config_file===================" >&2

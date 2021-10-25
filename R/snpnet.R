@@ -122,8 +122,8 @@ snpnet <- function(genotype.pfile, phenotype.file, phenotype, family = NULL, cov
   if (is.null(family)) family <- inferFamily(phe[['master']], phenotype, status.col)
   configs <- updateConfigsWithFamily(configs, family)
   if (configs[['verbose']]){
-    # dump the contents of configs object, except p.factor
-    print(configs[Filter(function(x){!x %in% c('p.factor')}, names(configs))])
+    # dump the contents of configs object, except p.factor and excludeSNP
+    print(configs[Filter(function(x){!x %in% c('p.factor', 'excludeSNP')}, names(configs))])
   }
 
   ### --- Check whether to use glmnet or glmnetPlus --- ###

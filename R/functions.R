@@ -737,7 +737,7 @@ setupConfigs <- function(configs, genotype.pfile, phenotype.file, phenotype, cov
         zstdcat.path='zstdcat',
         zcat.path='zcat',
         rank = TRUE,
-        excludeSNP = NULL
+        excludeSNP = NULL,
         excludeCHROM=character(0)
     )
     out <- defaults
