@@ -224,7 +224,7 @@ compute_mean <- function(df, percentile_col, phe_col, l_bin, u_bin){
     # Compute the mean and sd of the trait value (phe_col), based on the
     # binning (l_bin, u_bin] with the percentile of PRS (percentile_col)
     stratified_df <- df %>%
-    rename(!!'Percentile' := percentile_col, !!'phe' := phe_col) %>%
+    rename(!!'Percentile' := all_of(percentile_col), !!'phe' := all_of(phe_col)) %>%
     filter(l_bin < Percentile, Percentile <= u_bin)
 
     n     <- stratified_df %>% nrow()
@@ -253,7 +253,7 @@ filter_by_percentile_and_count_phe <- function(df, percentile_col, phe_col, l_bi
     # This provides the counts of the descrete phenotype value (phe_col)
     # for the specified bin (l_bin, u_bin], based on the percentile of PRS (percentile_col)
     df %>%
-    rename(!!'Percentile' := percentile_col, !!'phe' := phe_col) %>%
+    rename(!!'Percentile' := all_of(percentile_col), !!'phe' := all_of(phe_col)) %>%
     filter(l_bin < Percentile, Percentile <= u_bin) %>%
     count(phe)
 }
@@ -340,8 +340,8 @@ plot_PRS_vs_phe <- function(plot_df, plot_bin2d_x=NULL, plot_bin2d_y=NULL, geno_
 
     # rename the columns
     plot_df %>%
-    rename(!!'phe' := phe_col) %>%
-    rename(!!'geno_score' := geno_score_col) -> plot_dff
+    rename(!!'phe' := all_of(phe_col)) %>%
+    rename(!!'geno_score' := all_of(geno_score_col)) -> plot_dff
 
     if(geno_z){
         plot_dff %>% mutate(
@@ -371,7 +371,7 @@ plot_PRS_vs_phe <- function(plot_df, plot_bin2d_x=NULL, plot_bin2d_y=NULL, geno_
     ggplot(aes(x = geno_score_z, y = phe)) +
     geom_bin2d(binwidth = c(plot_bin2d_x, plot_bin2d_y)) +
     scale_fill_continuous(type = "viridis") +
-    theme_bw() +
+    theme_bw(base_size=16) +
     labs(x = ifelse(geno_z, 'snpnet PRS (Z-score)', 'snpnet PRS'))
 }
 
@@ -383,8 +383,8 @@ plot_PRS_binomial <- function(plot_df, geno_score_col='geno_score', phe_col='phe
 
     # rename the columns
     plot_df %>%
-    rename(!!'phe' := phe_col) %>%
-    rename(!!'geno_score' := geno_score_col) -> plot_dff
+    rename(!!'phe' := all_of(phe_col)) %>%
+    rename(!!'geno_score' := all_of(geno_score_col)) -> plot_dff
 
     if(geno_z){
         plot_dff %>% mutate(
@@ -396,7 +396,7 @@ plot_PRS_binomial <- function(plot_df, geno_score_col='geno_score', phe_col='phe
 
     plot_dff %>%
     left_join(
-        data.frame(phe_str=c('control', 'case'), phe=c(1, 2), stringsAsFactors=F), by='phe'
+        data.frame(phe_str=c('Control', 'Case'), phe=c(1, 2), stringsAsFactors=F), by='phe'
     ) %>%
     ggplot(aes(x = reorder(as.factor(phe_str), phe), y = geno_score_z, color=as.factor(phe))) +
     geom_violin() +
@@ -406,7 +406,7 @@ plot_PRS_binomial <- function(plot_df, geno_score_col='geno_score', phe_col='phe
         aes(ymax = ..y.., ymin = ..y..),
         width = 1.1, linetype = "dashed"
     ) +
-    theme_bw()+
+    theme_bw(base_size=16)+
     theme(legend.position = "none") +
     labs(x = 'phenotype', y = ifelse(geno_z, 'snpnet PRS (Z-score)', 'snpnet PRS'))
 }
@@ -418,7 +418,7 @@ plot_PRS_bin_vs_phe <- function(summary_plot_df, horizontal_line){
     geom_point() +
     geom_errorbar(aes(ymin = l_err, ymax = u_err)) +
     geom_hline(yintercept = horizontal_line, color='gray')+
-    theme_bw() +
+    theme_bw(base_size=16) +
     theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=.5))+
     labs(x = 'The percentile of snpnet PRS')
 }
@@ -545,7 +545,9 @@ compute_phe_score_df <- function(phe_df, phenotype, sscore_f, snpnet_covar_BETAs
     read_predicted_scores(sscore_f, snpnet_covar_BETAs_f, covariates) %>%
     drop_na(geno_score, covar_score) %>%
     inner_join(
-        phe_df %>% rename(!!'phe':= all_of(phenotype)) %>% select(FID, IID, phe, split, all_of(covariates)),
+        phe_df %>%
+        rename(!!'phe':= all_of(phenotype)) %>%
+        select(FID, IID, phe, split, all_of(covariates)),
         by=c('FID', 'IID')
     ) %>%
     drop_na(split, phe) %>% filter(phe != -9) -> phe_score_before_refit_df
