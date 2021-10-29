@@ -342,7 +342,16 @@ filter_by_percentile_and_count_phe <- function(df, percentile_col, phe_col, l_bi
     df %>%
     rename(!!'Percentile' := all_of(percentile_col), !!'phe' := all_of(phe_col)) %>%
     filter(l_bin < Percentile, Percentile <= u_bin) %>%
-    count(phe)
+    count(phe) %>%
+    # To cope with sparse bins where case or control counts are zero,
+    # we add the following dummy counts (zeros)
+    bind_rows(data.frame(
+        phe=c(1, 2),
+        n=as.integer(c(0,0))
+    )) %>%
+    group_by(phe) %>%
+    summarise(n = sum(n)) %>%
+    ungroup
 }
 
 compute_OR <- function(df, percentile_col, phe_col, l_bin, u_bin, cnt_middle){
