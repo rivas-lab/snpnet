@@ -273,8 +273,8 @@ count_n_per_split <- function(df, pheno_col, family, case_code = 1){
         df %>%
         rename(!! "phe__" := pheno_col) %>%
         count(split, phe__) %>%
-        mutate(phe = if_else(phe == case_code, "case_n", "control_n")) %>%
-        spread(phe, n) %>%
+        mutate(phe__ = if_else(phe__ == case_code, "case_n", "control_n")) %>%
+        spread(phe__, n) %>%
         replace_na(list(case_n = 0, control_n = 0))
     } else {
         # count the number of non-NA individuals
