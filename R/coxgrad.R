@@ -18,6 +18,3 @@ coxgrad <- function(f, time, d, w, eps=0.00001){
   grad[o] = d[o] -  ef * grad
   grad
 }
-
-
-  
