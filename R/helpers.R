@@ -8,9 +8,16 @@
 #' cat_or_zcat(file_path)
 #' fread(cmd = paste(cat_or_zcat(file_path), file_path))
 #'
-cat_or_zcat <- function(f){
-    ifelse(endsWith(f, '.zst'), 'zstdcat', ifelse(endsWith(f, '.gz'), 'zcat', 'cat'))
+cat_or_zcat <- function(filename, configs=list(zstdcat.path='zstdcat', zcat.path='zcat')){
+    if(stringr::str_ends(basename(filename), '.zst')){
+        return(configs[['zstdcat.path']])
+    }else if(stringr::str_ends(basename(filename), '.gz')){
+        return(configs[['zcat.path']])
+    }else{
+        return('cat')
+    }
 }
+
 
 #' split a list string into a list
 #'

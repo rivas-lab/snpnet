@@ -235,15 +235,6 @@ readIDsFromPsam <- function(psam){
     df$ID
 }
 
-cat_or_zcat <- function(filename, configs=list(zstdcat.path='zstdcat', zcat.path='zcat')){
-    if(stringr::str_ends(basename(filename), '.zst')){
-        return(configs[['zstdcat.path']])
-    }else if(stringr::str_ends(basename(filename), '.gz')){
-        return(configs[['zcat.path']])
-    }else{
-        return('cat')
-    }
-}
 
 readPlinkKeepFile <- function(keep_file){
     ID <- NULL  # to deal with "no visible binding for global variable"
