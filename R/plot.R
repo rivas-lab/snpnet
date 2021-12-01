@@ -83,7 +83,13 @@ plot_PRS_binomial <- function(plot_df, geno_score_col="geno_score", phe_col="phe
 
 plot_PRS_bin_vs_phe <- function(summary_plot_df, horizontal_line){
     summary_plot_df %>%
-    mutate(x_ticks_labels = paste0("[", bin_str, "]")) %>%
+    mutate(
+        x_ticks_labels = if_else(
+            startsWith(bin_str, "0%"),
+            paste0("[", bin_str, "]"),
+            paste0("(", bin_str, "]")
+        )
+    ) %>%
     ggplot(aes(x=reorder(x_ticks_labels, -u_bin), y=mean)) +
     geom_point() +
     geom_errorbar(aes(ymin = l_err, ymax = u_err)) +
