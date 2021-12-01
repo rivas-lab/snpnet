@@ -42,6 +42,8 @@ must exist.}
 
 \item{family}{Type of the phenotype: "gaussian" for continuous phenotype and "binomial" for binary phenotype.}
 
+\item{status_col}{Name of the status column for Cox model.}
+
 \item{snpnet_prefix}{Prefix of the snpnet result files used to construct the full path. Only if `saved_path` is specified.}
 
 \item{snpnet_suffix}{Extension suffix of the snpnet result files used to construct the full path. Only if `saved_path` is specified.}

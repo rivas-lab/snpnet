@@ -16,7 +16,7 @@ Encoding: UTF-8
 LazyData: true
 Imports: ROCR, utils, stringr, tibble, tidyr, stats, data.table, cindex, pgenlibr, glmnet (>= 3.0.2), dplyr, magrittr
 Depends: R (>= 3.6.1)
-RoxygenNote: 7.1.0
+RoxygenNote: 7.1.1
 Suggests: knitr,
     rmarkdown,
     glmnetPlus,
