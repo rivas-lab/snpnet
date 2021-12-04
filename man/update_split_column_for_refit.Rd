@@ -17,6 +17,8 @@ Given a data frame of the phenotype data, look at the 'split' column,
 and replace 'train' and 'val' with 'train_val'
 }
 \examples{
+\dontrun{
 update_split_column_for_refit(pheno_df)
+}
 
 }

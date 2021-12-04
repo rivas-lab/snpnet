@@ -19,6 +19,8 @@ Given a data frame of the phenotype data, recover FID and IID from
 rownames
 }
 \examples{
+\dontrun{
 FID_IID_from_rownames(pheno_df)
+}
 
 }

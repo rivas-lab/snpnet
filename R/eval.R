@@ -1,3 +1,5 @@
+#' @importFrom magrittr %>%
+#'
 compute_mean <- function(df, percentile_col, phe_col, l_bin, u_bin){
     # Compute the mean and sd of the trait value (phe_col), based on the
     # binning (l_bin, u_bin] with the percentile of PRS (percentile_col)
@@ -26,6 +28,9 @@ compute_mean <- function(df, percentile_col, phe_col, l_bin, u_bin){
     mutate(mean_str = as.character(mean_str))
 }
 
+
+#' @importFrom magrittr %>%
+#'
 filter_by_percentile_and_count_phe <- function(df, percentile_col, phe_col, l_bin, u_bin){
     # a helper function for compute_OR.
     # This provides the counts of the descrete phenotype value (phe_col)
@@ -45,6 +50,9 @@ filter_by_percentile_and_count_phe <- function(df, percentile_col, phe_col, l_bi
     ungroup
 }
 
+
+#' @importFrom magrittr %>%
+#'
 compute_OR <- function(df, percentile_col, phe_col, l_bin, u_bin, cnt_middle){
     # Compute the OR and sd of the trait value (phe_col), based on the
     # binning (l_bin, u_bin] with the percentile of PRS (percentile_col)
@@ -84,6 +92,9 @@ compute_OR <- function(df, percentile_col, phe_col, l_bin, u_bin, cnt_middle){
     )
 }
 
+
+#' @importFrom magrittr %>%
+#'
 compute_summary_OR_df <- function(df, percentile_col, phe_col, bins=NULL){
     if(is.null(bins)) bins <- ((0:10)/10)
     cnt_middle <- df %>%
@@ -97,6 +108,10 @@ compute_summary_OR_df <- function(df, percentile_col, phe_col, bins=NULL){
     bind_rows()
 }
 
+
+
+#' @importFrom magrittr %>%
+#'
 compute_summary_mean_df <- function(df, percentile_col, phe_col, bins=NULL){
     if(is.null(bins)) bins <- c(0, .0005, .01, (1:19)/20, .99, .9995, 1)
     1:(length(bins)-1) %>%
@@ -105,6 +120,7 @@ compute_summary_mean_df <- function(df, percentile_col, phe_col, bins=NULL){
     }) %>%
     bind_rows()
 }
+
 
 compute_summary_df <- function(df, percentile_col, phe_col, bins=NULL, family="gaussian"){
     if(family == "gaussian"){
@@ -141,6 +157,7 @@ glm_fit_to_r2 <- function(glm_fit){
 #' compose_regression_formula_str('HC326', c('covar', 'PRS.score-1'))
 #' compose_regression_formula_str('HC326', c('covar', 'PRS.score-1'), quote_char='')
 #'
+#' @export
 compose_regression_formula_str <- function(response, predictors, quote_char='`'){
     return(sprintf('%s ~ 1 + %s', paste0(quote_char, response, quote_char), paste(sapply(predictors, function(term){paste0(quote_char, term, quote_char)}), collapse=' + ')))
 }
@@ -158,8 +175,13 @@ compose_regression_formula_str <- function(response, predictors, quote_char='`')
 #' @param level The confidence level of the interval
 #' @return a data frame containing AUC (eval), confidence interval (l_eval, u_eval), p-value along with the information of the specified response and predictors
 #' @examples
+#' \dontrun{
 #' eval_AUC_CI(data_df, 'HC326', c('covar_score'))
+#' }
 #'
+#' @importFrom magrittr %>%
+#'
+#' @export
 eval_AUC_CI <- function(data, response, predictors, level=.95){
     # regression formula
     formula_str <- compose_regression_formula_str(response, predictors)
@@ -214,8 +236,11 @@ eval_AUC_CI <- function(data, response, predictors, level=.95){
 #' @param level The confidence level of the interval
 #' @return a data frame containing r-squared (eval), confidence interval (l_eval, u_eval), p-value along with the information of the specified response and predictors
 #' @examples
+#' \dontrun{
 #' eval_r2_CI(data_df, 'INI50', c('covar_score'))
+#' }
 #'
+#' @export
 eval_r2_CI <- function(data, response, predictors, level=.95){
     data %>% fit_glm(
         compose_regression_formula_str(response, predictors),
@@ -259,9 +284,12 @@ eval_r2_CI <- function(data, response, predictors, level=.95){
 #' @param level The confidence level of the interval
 #' @return a data frame containing r-squared or AUC (eval), confidence interval (l_eval, u_eval), p-value along with the information of the specified response and predictors
 #' @examples
+#' \dontrun{
 #' eval_CI(data_df, 'INI50', c('covar_score'), 'gaussian')
 #' eval_CI(data_df, 'HC326', c('covar_score'), 'binomial')
+#' }
 #'
+#' @export
 eval_CI <- function(data, response, predictors, family, level=.95){
     stopifnot(family %in% c('gaussian', 'binomial'))
     if(family == 'gaussian'){

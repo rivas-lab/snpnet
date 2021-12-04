@@ -33,6 +33,8 @@ You can specify the set of variables (variables) to focus
 if you don't want to use all the data in the beta_df.
 }
 \examples{
+\dontrun{
 compute_matrix_product(data_df, glm_fit_df, c('age', 'sex'), c('estimate'), 'variable')
+}
 
 }

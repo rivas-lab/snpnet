@@ -25,6 +25,8 @@ Note: you need to specify the list of binary and quantitative phenotypes
 using the phes_binary and phes_quantitative args.
 }
 \examples{
+\dontrun{
 recode_pheno_values(pheno_df, phes_binary=c('HC326'), phes_quantitative=c('INI50')
+}
 
 }

@@ -21,6 +21,8 @@ Given a data frame, a regression formula in string, and a model family,
 call glm function.
 }
 \examples{
+\dontrun{
 fit_glm(data, 'response ~ 1 + x + y', 'binomial')
+}
 
 }

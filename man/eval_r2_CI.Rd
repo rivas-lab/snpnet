@@ -24,6 +24,8 @@ compute the R-squared with confidence interval and the p-value.
 If multiple predictors are specified, we return the minimum p-value
 }
 \examples{
+\dontrun{
 eval_r2_CI(data_df, 'INI50', c('covar_score'))
+}
 
 }

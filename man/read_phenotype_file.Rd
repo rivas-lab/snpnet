@@ -22,8 +22,10 @@ along with 'FID', 'IID', 'population', and 'split' columns
 We recode -9 as NA in population, split, age, and sex columns
 }
 \examples{
+\dontrun{
 read_phenotype_file(phenotype_file_path, 'INI50')
 read_phenotype_file(phenotype_file_path, c('INI50', 'HC382'))
 read_phenotype_file(phenotype_file_path, c('age', 'sex', 'INI50', 'HC382'))
+}
 
 }
