@@ -274,6 +274,16 @@ update_split_column_for_refit <- function(pheno_df){
 }
 
 
+#' Count the number of individuals in each popluation split
+#'
+#' @param df A phenotype data frame with a column named 'split'
+#' @return a data frame containing the number of individuals
+#'
+#' @importFrom magrittr %>%
+#' @importFrom dplyr rename count mutate spread
+#' @importFrom tidyselect if_else
+#' @importFrom tidyr replace_na
+#'
 count_n_per_split <- function(df, pheno_col, family, case_code = 1){
     if (family == "binomial") {
         # count the number of cases and controls
