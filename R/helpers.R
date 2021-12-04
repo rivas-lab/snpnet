@@ -204,7 +204,6 @@ snpnet_fit_to_df <- function(
 #'
 #' @importFrom magrittr %>%
 #' @importFrom dplyr mutate across
-#' @importFrom tidyselect all_of
 #'
 recode_pheno_values <- function(pheno_df, phes_binary=NULL, phes_quantitative=NULL){
     pheno_df %>%
@@ -264,7 +263,6 @@ FID_IID_from_rownames <- function(pheno_df, sep="_"){
 #'
 #' @importFrom magrittr %>%
 #' @importFrom dplyr mutate
-#' @importFrom tidyselect if_else
 #'
 update_split_column_for_refit <- function(pheno_df){
     pheno_df %>%
@@ -281,7 +279,6 @@ update_split_column_for_refit <- function(pheno_df){
 #'
 #' @importFrom magrittr %>%
 #' @importFrom dplyr rename count mutate spread
-#' @importFrom tidyselect if_else
 #' @importFrom tidyr replace_na
 #'
 count_n_per_split <- function(df, pheno_col, family, case_code = 1){

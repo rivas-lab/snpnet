@@ -214,7 +214,6 @@ read_sscore_file <- function(sscore_file_path, columns=c('SCORE1_SUM')){
 #' @importFrom data.table fread
 #' @importFrom magrittr %>%
 #' @importFrom dplyr rename_with mutate across
-#' @importFrom tidyselect all_of
 #'
 read_phenotype_file <- function(phenotype_file_path, columns){
     fread(
