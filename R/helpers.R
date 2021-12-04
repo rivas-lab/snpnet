@@ -278,8 +278,8 @@ update_split_column_for_refit <- function(pheno_df){
 #' @return a data frame containing the number of individuals
 #'
 #' @importFrom magrittr %>%
-#' @importFrom dplyr rename count mutate spread
-#' @importFrom tidyr replace_na
+#' @importFrom dplyr rename count mutate
+#' @importFrom tidyr replace_na spread
 #'
 count_n_per_split <- function(df, pheno_col, family, case_code = 1){
     if (family == "binomial") {
