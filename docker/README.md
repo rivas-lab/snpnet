@@ -1,24 +1,36 @@
-# Docker image
+# Docker image of `snpnet`
 
-Local
+We make the Docker image available at [Docker Hub](https://hub.docker.com/repository/docker/yosuketanigawa/snpnet).
 
-```{bash}
-docker build .
-docker tag  ef83b7a0d37c  yosuketanigawa/201912_test_repo:20191221
-docker push yosuketanigawa/201912_test_repo:20191221
-```
+## How to use the Docker image?
 
-Sherlock
+### Docker
 
 ```{bash}
-cd /scratch/groups/mrivas/users/ytanigaw/simg
-singularity pull docker://yosuketanigawa/201912_test_repo:20191221
+docker run yosuketanigawa/snpnet:latest R
+
+> library(snpnet)
 ```
+
+### Singularity
 
 ```{bash}
-docker run yosuketanigawa/201912_test_repo:20191221 /tmp/snpnet_wrapper.sh /Users/yosuketanigawa/repos/rivas-lab/snpnet/inst/extdata/sample /Users/yosuketanigawa/repos/rivas-lab/snpnet/inst/extdata/sample.phe QPHE gaussian test_QPHE
+singularity pull docker://yosuketanigawa/snpnet:latest
+singularity -s exec snpnet_latest.sif R
+
+> library(snpnet)
 ```
 
---> it seems like tidyverse is not installed..
+## How to build the Docker image and push it to the Docker Hub?
 
---> Switch to Rstudio:R
+```{bash}
+docker build . -t yosuketanigawa/snpnet:latest
+docker push yosuketanigawa/snpnet:latest
+```
+
+## Version log
+
+- `v1.4.1`: (`yosuketanigawa/snpnet:v1.4.1`): We use the following versions of the software
+  - `R` from `jupyter/r-notebook:2021-11-20`
+  - `plink2`: Alpha 2.3 final (24 Jan 2020) Linux 64-bit Intel
+  - `snpnet` version 1.4.1
