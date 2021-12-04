@@ -24,6 +24,8 @@ compute the AUC with confidence interval and the p-value.
 If multiple predictors are specified, we return the minimum p-value
 }
 \examples{
+\dontrun{
 eval_AUC_CI(data_df, 'HC326', c('covar_score'))
+}
 
 }

@@ -25,7 +25,9 @@ We currently supports gaussian and binomial models.
 If multiple predictors are specified, we return the minimum p-value
 }
 \examples{
+\dontrun{
 eval_CI(data_df, 'INI50', c('covar_score'), 'gaussian')
 eval_CI(data_df, 'HC326', c('covar_score'), 'binomial')
+}
 
 }

@@ -19,6 +19,8 @@ Read a sscore file (output from plink2 --score function) as a data frame
 for the specified columns along with 'FID' and 'IID'
 }
 \examples{
+\dontrun{
 read_sscore_file(sscore_file_path)
+}
 
 }

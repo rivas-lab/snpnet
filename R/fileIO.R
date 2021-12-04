@@ -179,8 +179,11 @@ save_BETA <- function(df, out.file.head, pvar, covariates = NULL, verbose=FALSE)
 #' @param columns a list of columns to read
 #' @return data frame containing phenotype data
 #' @examples
+#' \dontrun{
 #' read_sscore_file(sscore_file_path)
+#' }
 #'
+#' @export
 read_sscore_file <- function(sscore_file_path, columns=c('SCORE1_SUM')){
     fread(
         cmd=paste(
@@ -207,15 +210,17 @@ read_sscore_file <- function(sscore_file_path, columns=c('SCORE1_SUM')){
 #' @param columns a list of columns to read
 #' @return data frame containing phenotype data
 #' @examples
+#' \dontrun{
 #' read_phenotype_file(phenotype_file_path, 'INI50')
 #' read_phenotype_file(phenotype_file_path, c('INI50', 'HC382'))
 #' read_phenotype_file(phenotype_file_path, c('age', 'sex', 'INI50', 'HC382'))
+#' }
 #'
 #' @importFrom data.table fread
 #' @importFrom magrittr %>%
 #' @importFrom dplyr rename_with mutate across
-#' @importFrom tidyselect all_of
 #'
+#' @export
 read_phenotype_file <- function(phenotype_file_path, columns){
     fread(
         cmd = paste(

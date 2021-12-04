@@ -19,7 +19,12 @@ One of the following 3 commands: zstdcat, zcat, or cat.
 Check the suffix of the filename and return one of zstdcat, zcat, or cat
 }
 \examples{
+cat_or_zcat("file.txt")
+cat_or_zcat("file.txt.gz")
+cat_or_zcat("file.txt.zst")
+\dontrun{
 cat_or_zcat(file_path)
 fread(cmd = paste(cat_or_zcat(file_path), file_path))
+}
 
 }

@@ -5,8 +5,15 @@
 #' @param f A file path.
 #' @return One of the following 3 commands: zstdcat, zcat, or cat.
 #' @examples
+#' cat_or_zcat("file.txt")
+#' cat_or_zcat("file.txt.gz")
+#' cat_or_zcat("file.txt.zst")
+#' \dontrun{
 #' cat_or_zcat(file_path)
 #' fread(cmd = paste(cat_or_zcat(file_path), file_path))
+#' }
+#'
+#' @export
 #'
 cat_or_zcat <- function(filename, configs=list(zstdcat.path='zstdcat', zcat.path='zcat')){
     if(stringr::str_ends(basename(filename), '.zst')){
@@ -29,6 +36,8 @@ cat_or_zcat <- function(filename, configs=list(zstdcat.path='zstdcat', zcat.path
 #' split_list_str('a,b,c')
 #' split_list_str('a;b;c', ';')
 #'
+#' @importFrom stringr str_split
+#' @export
 split_list_str <- function(list_str, pattern=','){
     str_split(list_str, pattern)[[1]]
 }
@@ -45,6 +54,8 @@ split_list_str <- function(list_str, pattern=','){
 #' lapply(split_named_list_str('x=1;y=2;z=3', pattern1=';'), as.numeric)
 #' lapply(split_named_list_str('p-1;q-2;r-3', pattern1=';', pattern2 = '-'), as.numeric)
 #'
+#' @importFrom stringr str_split
+#' @export
 split_named_list_str <- function(named_list_str, pattern1=',', pattern2='='){
     str_split(named_list_str, pattern1)[[1]] -> l
     setNames(
@@ -137,6 +148,7 @@ parse_covariates <- function(covariates_str) {
 #'
 #' @return list of ID_ALT values
 #'
+#' @export
 get_ID_ALTs <- function(ID_ALT_file) {
     fread(
         cmd = paste(cat_or_zcat(ID_ALT_file), ID_ALT_file),
@@ -157,6 +169,7 @@ get_ID_ALTs <- function(ID_ALT_file) {
 #'
 #' @return a data frame containing betas
 #'
+#' @export
 snpnet_fit_to_df <- function(
     beta, lambda_idx, covariates = NULL, verbose=FALSE
 ) {
@@ -200,12 +213,14 @@ snpnet_fit_to_df <- function(
 #' @param phes_quantitative A list of quantitative phenotypes
 #' @return an updated phenotype data drame
 #' @examples
+#' \dontrun{
 #' recode_pheno_values(pheno_df, phes_binary=c('HC326'), phes_quantitative=c('INI50')
+#' }
 #'
 #' @importFrom magrittr %>%
 #' @importFrom dplyr mutate across
-#' @importFrom tidyselect all_of
 #'
+#' @export
 recode_pheno_values <- function(pheno_df, phes_binary=NULL, phes_quantitative=NULL){
     pheno_df %>%
     dplyr::mutate(
@@ -224,8 +239,11 @@ recode_pheno_values <- function(pheno_df, phes_binary=NULL, phes_quantitative=NU
 #' @param sep A separater to concatenate FID and IID
 #' @return an updated phenotype data drame with rownames
 #' @examples
+#' \dontrun{
 #' FID_IID_to_rownames(pheno_df)
+#' }
 #'
+#' @export
 FID_IID_to_rownames <- function(pheno_df, sep ="_"){
     pheno_df %>%
     mutate(FID_IID = paste(FID, IID, sep=sep)) %>%
@@ -242,9 +260,16 @@ FID_IID_to_rownames <- function(pheno_df, sep ="_"){
 #' @param pheno_df A phenotype data frame with rownames
 #' @param sep A separater used to concatenate FID and IID
 #' @return an updated phenotype data drame with FID and IID columns
-#' @examples
-#' FID_IID_from_rownames(pheno_df)
 #'
+#' @examples
+#' \dontrun{
+#' FID_IID_from_rownames(pheno_df)
+#' }
+#'
+#' @importFrom magrittr %>%
+#' @importFrom dplyr mutate
+#'
+#' @export
 FID_IID_from_rownames <- function(pheno_df, sep="_"){
     pheno_df %>%
     rownames_to_column("FID_IID") %>%
@@ -258,14 +283,18 @@ FID_IID_from_rownames <- function(pheno_df, sep="_"){
 #' and replace 'train' and 'val' with 'train_val'
 #'
 #' @param pheno_df A phenotype data frame with a column named 'split'
+#'
 #' @return an updated phenotype data drame
+#'
 #' @examples
+#' \dontrun{
 #' update_split_column_for_refit(pheno_df)
+#' }
 #'
 #' @importFrom magrittr %>%
 #' @importFrom dplyr mutate
-#' @importFrom tidyselect if_else
 #'
+#' @export
 update_split_column_for_refit <- function(pheno_df){
     pheno_df %>%
     mutate(
@@ -274,6 +303,16 @@ update_split_column_for_refit <- function(pheno_df){
 }
 
 
+#' Count the number of individuals in each popluation split
+#'
+#' @param df A phenotype data frame with a column named 'split'
+#' @return a data frame containing the number of individuals
+#'
+#' @importFrom magrittr %>%
+#' @importFrom dplyr rename count mutate
+#' @importFrom tidyr replace_na spread
+#'
+#' @export
 count_n_per_split <- function(df, pheno_col, family, case_code = 1){
     if (family == "binomial") {
         # count the number of cases and controls
@@ -305,8 +344,11 @@ count_n_per_split <- function(df, pheno_col, family, case_code = 1){
 #' @param beta_variable_col The column name of the beta_df that contains the variable name.
 #' @return a data frame containing the results of XB
 #' @examples
+#' \dontrun{
 #' compute_matrix_product(data_df, glm_fit_df, c('age', 'sex'), c('estimate'), 'variable')
+#' }
 #'
+#' @export
 compute_matrix_product <- function(
     X_df, beta_df, variables=NULL,
     beta_estimate_cols=c('estimate'),
@@ -345,8 +387,11 @@ compute_matrix_product <- function(
 #' @param family The GLM family
 #' @return a glm fit object
 #' @examples
+#' \dontrun{
 #' fit_glm(data, 'response ~ 1 + x + y', 'binomial')
+#' }
 #'
+#' @export
 fit_glm <- function(data_df, formula_str, family){
     glm(stats::as.formula(formula_str), family=family, data=data_df)
 }
@@ -354,6 +399,7 @@ fit_glm <- function(data_df, formula_str, family){
 
 #' Fit a specified regression model for each split independently
 #' and aggregate the results into one data frame
+#' @export
 fit_glm_across_splits <- function(pheno_df, splits, glm_formula_str, family, split_col = "split"){
     lapply(splits, function(s){
         pheno_df %>%
@@ -367,7 +413,7 @@ fit_glm_across_splits <- function(pheno_df, splits, glm_formula_str, family, spl
     bind_rows()
 }
 
-
+#' @export
 compute_covariate_score <- function(pheno_df, beta_df, variables, beta_cols){
     pheno_df %>%
     FID_IID_to_rownames() %>%
@@ -380,6 +426,7 @@ compute_covariate_score <- function(pheno_df, beta_df, variables, beta_cols){
 }
 
 
+#' @export
 compute_covariate_score_across_splits <- function(
     pheno_df, covar_BETAs_df, covariates, splits, covar_score_name, split_col = "split"
 ){
@@ -409,6 +456,8 @@ compute_covariate_score_across_splits <- function(
     bind_rows()
 }
 
+
+#' @export
 eval_CI_across_splits <- function(
     pheno_df, predictors, pheno_col, family, splits, split_col = "split", verbose=F
 ){

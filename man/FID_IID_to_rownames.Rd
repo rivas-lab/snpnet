@@ -19,6 +19,8 @@ Given a data frame of the phenotype data, concatenate FID and IID
 columns with a separater character (sep) and use it as a rowname
 }
 \examples{
+\dontrun{
 FID_IID_to_rownames(pheno_df)
+}
 
 }
