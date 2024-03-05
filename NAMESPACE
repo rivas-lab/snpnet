@@ -2,6 +2,7 @@
 
 export(cox_fisher)
 export(eigenCrossProd)
+export(predict_external)
 export(predict_snpnet)
 export(readIDsFromPsam)
 export(readPheMaster)

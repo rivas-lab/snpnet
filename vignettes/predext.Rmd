@@ -1,0 +1,131 @@
+---
+title: "Prediction using External Weights"
+author: "Balasubramanian Narasimhan"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Prediction using External Weights}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+### Introduction
+
+Suppose one has coefficients for variants and covariates from a `Snpnet` model trained externally. This vignette describes how to use `Snpnet` to predict for new data and new phenotype in that case. We assume that we have:
+
+- `variant_coefs`: a named vector of coefficients (weights) for the variants; the names must be those in the genotype files below.
+- `new_genotype_pfile`: a PLINK 2.0 pgen file that contains genotype. We assume the existence of genotype.pfile.{pgen,pvar.zst,psam}.
+- `new_phenotype_file`: the path of the file that contains the phenotype values and can be read as a table.
+- `phenotype`: the name of the phenotype. Must be the same as the corresponding column name in the phenotype file.
+- `intercept`: optional value for the intercept, zero if not specified.
+- `covariate_coefs`: an optional named numeric vector containing the coefficient of the covariates to be used.  The names must exist in the column names of the phenotype file.
+- `family`: the type of the phenotype: "gaussian", "binomial" or "cox". If not provided or NULL, it will be detected based on the number of levels in the response.
+
+### A Simple Example
+
+We demonstrate a simple lasso example first as in other vignette.
+
+```{r}
+## Boilerplate almost
+library(snpnet)
+configs <- list(
+  # results.dir = "PATH/TO/SAVE/DIR",  # needed when saving intermediate results
+  # save = TRUE,  # save intermediate results per iteration (default FALSE)
+  # nCores = 16,  # number of cores available (default 1)
+  # niter = 100,  # max number of iterations (default 50)
+  # prevIter = 15,  # if we want to start from some iteration saved in results.dir
+  # use.glmnetPlus = TRUE,  # recommended for faster computation
+  # early.stopping = FALSE,  # whether to stop based on validation performance (default TRUE)
+  plink2.path = "plink2",   # path to plink2 program
+  zstdcat.path = "zstdcat"  # path to zstdcat program
+)
+# check if the provided paths are valid
+for (name in names(configs)) {
+  tryCatch(system(paste(configs[[name]], "-h"), ignore.stdout = T),
+           condition = function(e) cat("Please add", configs[[name]], "to PATH, or modify the path in the configs list.")
+           )
+}
+```
+
+As before, we will train a simple `snpnet` model on the example data in the package.
+
+```{r, results='hide', message=FALSE, warning=FALSE}
+genotype.pfile <- file.path(system.file("extdata", package = "snpnet"), "sample")
+phenotype.file <- system.file("extdata", "sample.phe", package = "snpnet")
+phenotype <- "QPHE"
+covariates <- c("age", "sex", paste0("PC", 1:10))
+
+fit_snpnet <- snpnet(  
+  genotype.pfile = genotype.pfile,
+  phenotype.file = phenotype.file,
+  phenotype = phenotype,
+  covariates = covariates,
+  # split.col = "split",  # split column name in phenotype.file with train/val/test labels
+  # mem = 128000,  # amount of memory available (MB), recommended
+  configs = configs
+)  # we hide the intermediate messages
+```
+
+Let us now make a prediction using the 5-th $\lambda$ value.
+```{r}
+pred_snpnet <- predict_snpnet(
+  fit = fit_snpnet,
+  idx = 5,
+  new_genotype_file = genotype.pfile,
+  new_phenotype_file = phenotype.file,
+  phenotype = phenotype,
+  covariate_names = covariates,
+  split_col = "split",
+  split_name = c("train", "val", "test"),  # can also include "test" if such samples are available in the phenotype file
+  configs = configs)
+```
+
+## Using External Weights
+
+We now pretend that the 5-th $\beta$ was given to us externally. Note that `snpnet` includes both covariates and the variates in the coefficient vectors, so we separate them.
+
+```{r}
+coefs <- fit_snpnet$beta[[5]]
+covariate_coefs <- coefs[1:12]
+variant_coefs <- coefs[-(1:12)]
+intercept <- fit_snpnet$a0[[5]]
+```
+
+We use these as the coefficients in our prediction as below.
+
+```{r}
+pred_external <- predict_external(
+  variant_coefs = variant_coefs,
+  new_genotype_file = genotype.pfile,
+  new_phenotype_file = phenotype.file,
+  phenotype = phenotype,
+  intercept = intercept,
+  covariate_coefs = covariate_coefs,
+  split_col = "split",
+  split_name = c("train", "val", "test"),  # can also include "test" if such samples are available in the phenotype file
+  configs = configs)
+```
+
+As a sanity check, we can compare the two results to ensure that they give similar metrics below. _However, because the `predict_external` function does mean imputing for missing values in a slightly different way from `snpnet`, there will be differences in the predictions._
+
+```{r}
+identical(row.names(pred_external$prediction$train), row.names(pred_snpnet$prediction$train))
+identical(row.names(pred_external$prediction$val), row.names(pred_snpnet$prediction$val))
+identical(row.names(pred_external$prediction$test), row.names(pred_snpnet$prediction$test))
+```
+
+Next the metrics.
+
+```{r}
+cat(sprintf("Train Metrics: Snpnet %f, External %f\n", pred_snpnet$metric$train, pred_external$metric$train))
+cat(sprintf("Val Metrics: Snpnet %f, External %f\n", pred_snpnet$metric$val, pred_external$metric$val))
+cat(sprintf("Test Metrics: Snpnet %f, External %f\n", pred_snpnet$metric$val, pred_external$metric$val))
+```
+

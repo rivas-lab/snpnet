@@ -196,11 +196,13 @@ predict_snpnet <- function(fit = NULL, saved_path = NULL, new_genotype_file, new
 #' @importFrom magrittr %>%
 #' @importFrom dplyr n
 preparefloatFeatures <- function(pgen, vars, names, stat) {
-  buf <- pgenlibr::ReadList(pgen, match(names, vars), meanimpute=F)
+  buf <- pgenlibr::ReadList(pgen, match(names, vars), meanimpute = is.null(stat))
   features.add <- as.data.table(buf)
   colnames(features.add) <- names
-  for (j in 1:length(names)) {
-    set(features.add, i=which(is.na(features.add[[j]])), j=j, value=stat[["means"]][names[j]])
+  if (!is.null(stat)) {
+    for (j in 1:length(names)) {
+      set(features.add, i=which(is.na(features.add[[j]])), j=j, value=stat[["means"]][names[j]])
+    }
   }
   features.add
 }
@@ -746,4 +748,136 @@ memoryProfile <- function(obj=NULL, message=''){
     print(pryr::object_size(obj))
   }
   snpnetLogger('end', funcname='memoryProfile')
+}
+
+
+#' Predict from using external weights
+#'
+#' @usage predict_external(variant_coefs, new_genotype_file, new_phenotype_file,
+#'   phenotype, intercept = NULL, covariate_coefs = NULL, split_col = NULL, split_name = NULL, family = NULL, configs = list(zstdcat.path = "zstdcat", zcat.path = 'zcat'))
+#'
+#' @param variant_coefs the named vector of variant coefficents or weights where the names must match what is the genotype file
+#' @param new_phenotype_file path to the phenotype. The header must include FID, IID. Used for extracting covaraites and computing metrics.
+#' @param phenotype name of the phenotype for which the fit was computed.
+#' @param new_genotype_file Path to the new suite of genotype files. new_genotype_file.{pgen, psam, pvar.zst} must exist.
+#' @param intercept the intercept to use, zero by default
+#' @param covariate_coefs a named vector of covariate coefficents, zero by default
+#' @param split_col name of the split column. If NULL, all samples will be used.
+#' @param split_name vector of split labels where prediction is to be made. Should be a combination of "train" (default), "val", "test".
+#' @param family Type of the phenotype: "gaussian" for continuous phenotype and "binomial" for binary phenotype.
+#' @param status_col name of the status column for Cox model.
+#' @param configs additional list of configs including path to either zstdcat or zcat.
+#' @return a list containing the prediction and the response for which the prediction is made.
+#'
+#' @export
+predict_external <- function(variant_coefs, new_genotype_file, new_phenotype_file, phenotype,
+                             intercept = 0, covariate_coefs = NULL,
+                             family = NULL, status_col = NULL,
+                             configs = list(zstdcat.path = "zstdcat", zcat.path='zcat')) {
+
+  if (is.null(intercept)) {
+    a0 <- 0.0
+  } else {
+    a0 <- intercept
+  }
+  if (!is.null(covariate_coefs)) {
+    covariate_names <- names(covariate_coefs)
+  } else {
+    covariate_names <- NULL
+  }
+
+  beta <- variant_coefs
+  feature_names <- names(beta)
+  ids <- list()
+  ids[["psam"]] <- readIDsFromPsam(paste0(new_genotype_file, '.psam'))
+
+  phe_master <- readPheMaster(new_phenotype_file, ids[['psam']], family, covariate_names, phenotype, status_col, split_col, configs)
+
+  if (length(covariate_names) > 0) {
+    cov_master <- as.matrix(phe_master[, covariate_names, with = FALSE])
+    cov_no_missing <- apply(cov_master, 1, function(x) all(!is.na(x)))
+    phe_master <- phe_master[cov_no_missing, ]
+  }
+
+  if (is.null(family)) family <- inferFamily(phe_master, phenotype, status_col)
+  if (is.null(configs[["metric"]])) configs[["metric"]] <- setDefaultMetric(family)
+
+  if (is.null(split_col)) {
+    split_name <- "train"
+    ids[["train"]] <- phe_master$ID
+  } else {
+    for (split in split_name) {
+      ids[[split]] <- phe_master$ID[phe_master[[split_col]] == split]
+      if (length(ids[[split]]) == 0) {
+        warning(paste("Split", split, "doesn't exist in the phenotype file. Excluded from prediction.\n"))
+        split_name <- setdiff(split_name, split)
+      }
+    }
+  }
+
+  phe <- list()
+  for (split in split_name) {
+    ids_loc <- match(ids[[split]], phe_master[["ID"]])
+    phe[[split]] <- phe_master[ids_loc]
+  }
+
+  covariates <- list()
+
+  for (split in split_name) {
+    if (length(covariate_names) > 0) {
+      covariates[[split]] <- phe[[split]][, covariate_names, with = FALSE]
+    } else {
+      covariates[[split]] <- NULL
+    }
+  }
+
+  vars <- dplyr::mutate(dplyr::rename(data.table::fread(cmd=paste0(configs[["zstdcat.path"]], ' ', paste0(new_genotype_file, '.pvar.zst'))), 'CHROM'='#CHROM'), VAR_ID=paste(ID, ALT, sep='_'))$VAR_ID
+  pvar <- pgenlibr::NewPvar(paste0(new_genotype_file, '.pvar.zst'))
+  chr <- list()
+  for (split in split_name) {
+    chr[[split]] <- pgenlibr::NewPgen(paste0(new_genotype_file, '.pgen'), pvar = pvar, sample_subset = match(ids[[split]], ids[["psam"]]))
+  }
+  pgenlibr::ClosePvar(pvar)
+
+  features <- list()
+  for (split in split_name) {
+    if (!is.null(covariates[[split]])) {
+      features[[split]] <- data.table::data.table(covariates[[split]])
+      features[[split]][, (feature_names) := preparefloatFeatures(chr[[split]], vars, feature_names, stat = NULL)]
+    } else {
+      features[[split]] <- preparefloatFeatures(chr[[split]], vars, feature_names, stat = NULL)
+    }
+  }
+
+  pred <- list()
+  metric <- list()
+  for (split in split_name) {
+    pred[[split]] <- array(dim = c(nrow(features[[split]]), 1),
+                           dimnames = list(ids[[split]], "s0"))
+    metric[[split]] <- rep(NA, 1)
+    names(metric[[split]]) <- "s0"
+  }
+
+  response <- list()
+  for (split in split_name) {
+    response[[split]] <- phe[[split]][[phenotype]]
+    if(family == "cox"){
+      status_local <- phe[[split]][[status_col]]
+      response[[split]] <- survival::Surv(response[[split]], status_local)
+    }
+  }
+
+  for (split in split_name) {
+    active_names <- names(beta)[beta != 0]
+    if (length(active_names) > 0) {
+      features_single <- as.matrix(features[[split]][, c(covariate_names, active_names), with = FALSE])
+    } else {
+      features_single <- matrix(0, nrow(features[[split]]), 0)
+    }
+    pred_single <- a0 + features_single %*% c(covariate_coefs, beta[active_names])
+    pred[[split]][, 1] <- as.matrix(pred_single)
+    metric[[split]] <- computeMetric(pred[[split]], response[[split]], configs[["metric"]])
+  }
+
+  list(prediction = pred, response = response, metric = metric)
 }
