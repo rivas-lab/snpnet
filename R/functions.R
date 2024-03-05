@@ -772,6 +772,7 @@ memoryProfile <- function(obj=NULL, message=''){
 #' @export
 predict_external <- function(variant_coefs, new_genotype_file, new_phenotype_file, phenotype,
                              intercept = 0, covariate_coefs = NULL,
+                             split_col = NULL, split_name = NULL,
                              family = NULL, status_col = NULL,
                              configs = list(zstdcat.path = "zstdcat", zcat.path='zcat')) {
 
